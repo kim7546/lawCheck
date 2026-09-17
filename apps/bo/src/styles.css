@@ -1,0 +1,253 @@
+:root {
+  font-family: system-ui, 'Malgun Gothic', sans-serif;
+  color: #293f35;
+  background: #f8faf6;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+a {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+.office-shell {
+  display: flex;
+  min-height: 100dvh;
+}
+aside {
+  width: 238px;
+  background: #183e33;
+  color: #eaf0e3;
+  padding: 32px 22px;
+  display: flex;
+  flex-direction: column;
+}
+.office-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 20px;
+  letter-spacing: -0.7px;
+}
+.office-logo span {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #a3bb8c;
+  margin-left: 5px;
+}
+.office-label {
+  font-size: 11px;
+  color: #8ca793;
+  margin: 17px 0 42px;
+}
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  border: 0;
+  background: none;
+  color: #a9bfb0;
+  text-align: left;
+  border-radius: 7px;
+  font-size: 12px;
+}
+nav button.active,
+nav button:hover {
+  background: #2a4f3f;
+  color: #eef4e8;
+}
+.fo-link {
+  margin-top: auto;
+  padding-top: 50px;
+  text-decoration: none;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #acc4a6;
+}
+main {
+  flex: 1;
+  min-width: 0;
+}
+header {
+  height: 77px;
+  border-bottom: 1px solid #e2e8dc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 38px;
+  font-size: 10px;
+  color: #7c8973;
+}
+.preview {
+  background: #e9efdf;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 10px;
+}
+main > section {
+  max-width: 1160px;
+  padding: 43px 40px;
+  margin: auto;
+}
+.eyebrow {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #839a6c;
+}
+h1 {
+  font-size: 30px;
+  letter-spacing: -1px;
+  margin: 15px 0;
+}
+main > section > p {
+  font-size: 13px;
+  color: #819174;
+}
+.setup-notice {
+  background: #eef3e5;
+  border: 1px solid #dce6cd;
+  padding: 20px;
+  border-radius: 9px;
+  display: flex;
+  gap: 13px;
+  margin-top: 28px;
+}
+.setup-notice > svg {
+  color: #738b58;
+}
+.setup-notice strong {
+  font-size: 12px;
+}
+.setup-notice p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #849572;
+  margin-bottom: 0;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 25px 0;
+}
+.stats article {
+  background: white;
+  border: 1px solid #e2e8db;
+  border-radius: 8px;
+  padding: 21px;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+.stats span {
+  font-size: 11px;
+  color: #7c8b70;
+}
+.stats strong {
+  font-size: 27px;
+}
+.stats small {
+  font-size: 9px;
+  color: #a0aa96;
+}
+.empty-state {
+  border: 1px dashed #ccd9bf;
+  border-radius: 10px;
+  text-align: center;
+  padding: 65px 20px;
+  margin-top: 26px;
+  background: #fbfcf8;
+  color: #829c6c;
+}
+.empty-state h2 {
+  font-size: 17px;
+  color: #4a6340;
+  font-weight: 500;
+}
+.empty-state p {
+  font-size: 12px;
+  line-height: 2;
+  color: #8c9a80;
+}
+.empty-state > span {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 10px;
+  border-radius: 4px;
+  background: #edf2e5;
+  padding: 7px 12px;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #9cb57b;
+  outline-offset: 3px;
+}
+@media (max-width: 850px) {
+  aside {
+    width: 195px;
+    padding: 25px 15px;
+  }
+  .office-logo {
+    font-size: 17px;
+  }
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  main > section {
+    padding: 28px 22px;
+  }
+  header {
+    padding: 0 23px;
+  }
+}
+@media (max-width: 600px) {
+  .office-shell {
+    flex-direction: column;
+  }
+  aside {
+    width: 100%;
+    padding: 18px;
+  }
+  .office-label {
+    margin: 10px 0 17px;
+  }
+  nav {
+    flex-direction: row;
+    overflow: auto;
+  }
+  nav button {
+    white-space: nowrap;
+    padding: 10px;
+    gap: 6px;
+    font-size: 10px;
+  }
+  nav svg {
+    width: 14px;
+  }
+  .fo-link {
+    display: none;
+  }
+  header {
+    height: 55px;
+  }
+  .setup-notice {
+    padding: 15px;
+  }
+  .empty-state {
+    padding: 35px 15px;
+  }
+}
