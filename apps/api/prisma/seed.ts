@@ -10,7 +10,7 @@ try {
     update: {},
     create: {
       code: process.env.LAW_OFFICE_CODE ?? 'LAW001',
-      name: process.env.LAW_OFFICE_NAME ?? '법률사무소 이음',
+      name: process.env.LAW_OFFICE_NAME ?? '법률사무소 IBS',
     },
   });
   console.log('Development office seed is ready.');

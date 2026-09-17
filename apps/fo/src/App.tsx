@@ -52,7 +52,7 @@ const topics = [
   },
 ];
 const defaultConfig: PublicConfig = {
-  officeName: '법률사무소 이음',
+  officeName: '법률사무소 IBS',
   mode: 'prototype',
   maxQuestions: 5,
 };

@@ -2,7 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import type { HealthResponse, PublicConfig } from '@lawcheck/contracts';
 
-export function createApp(officeName = '법률사무소 이음') {
+export function createApp(officeName = '법률사무소 IBS') {
   const app = express();
   app.disable('x-powered-by');
   app.use(helmet());
