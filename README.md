@@ -50,6 +50,12 @@ docs/                 기획서·MCP 설정 예시
 
 BO는 관리용 애플리케이션입니다. 공통 Backend는 `apps/api`에 별도로 둡니다.
 
+## Railway 체험 배포
+
+FO·BO의 로컬 개발 설정은 `vite.config.ts`, 배포 확인 설정은 `vite.preview.config.ts`로 분리합니다.
+배포용 API 주소는 `API_PROXY_TARGET`으로 지정하며, 미설정 시 로컬 API로 연결하지 않습니다.
+실행 명령과 환경변수는 [Railway 배포 안내](docs/railway-deployment.md)를 참고하세요.
+
 ## 데이터베이스 준비
 
 Docker Desktop 또는 별도 PostgreSQL 서버가 필요합니다. 첫 화면 실행에는 DB가 필요하지 않습니다.
