@@ -9,23 +9,30 @@
     "start": "node dist/server.deploy.js",
     "start:local": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/app.test.ts src/server.config.test.ts",
+    "test": "tsx --test src/app.test.ts src/server.config.test.ts src/chat-storage.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "node prisma/seed.mjs",
+    "db:deploy": "prisma migrate deploy && node prisma/seed.mjs",
+    "db:status": "prisma migrate status",
+    "db:validate": "prisma validate",
+    "db:check": "node prisma/check.mjs",
+    "db:studio": "prisma studio --browser none",
+    "db:test": "prisma db execute --file prisma/tests/integrity.sql --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@lawcheck/contracts": "*",
     "@prisma/client": "6.12.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "helmet": "^8.1.0"
+    "helmet": "^8.1.0",
+    "prisma": "6.12.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.5",
     "@types/node": "^24.10.0",
     "@types/supertest": "^6.0.3",
-    "prisma": "6.12.0",
     "supertest": "^7.1.4",
     "tsx": "^4.20.6"
   }

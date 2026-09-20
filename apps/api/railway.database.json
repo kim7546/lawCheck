@@ -1,0 +1,23 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "apps/api/Dockerfile",
+    "watchPatterns": [
+      "/apps/api/**",
+      "/packages/contracts/**",
+      "/package.json",
+      "/package-lock.json",
+      "/tsconfig.base.json",
+      "/.dockerignore"
+    ]
+  },
+  "deploy": {
+    "preDeployCommand": ["npm run db:deploy"],
+    "startCommand": "node apps/api/dist/server.deploy.js",
+    "healthcheckPath": "/api/v1/health",
+    "healthcheckTimeout": 60,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}

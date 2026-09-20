@@ -6,5 +6,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+.tmp/
+backups/
 *.log
 .DS_Store

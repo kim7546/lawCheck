@@ -30,11 +30,11 @@ npm run dev
 - TypeScript strict, ESLint, API 테스트, 데스크톱·모바일 Playwright 테스트
 - 개발용 OpenAI Docs MCP 설정 예시
 
-질문을 보내면 서버의 `POST /api/v1/chat`이 OpenAI Responses API를 호출하고 다음 말풍선에 GPT 답변을 표시합니다. 이전에 완료된 대화도 함께 전달합니다. 로딩·오류 상태를 표시하며 실패한 질문은 다시 전송할 수 있습니다. 대화는 React 메모리에만 유지되며 새로고침 시 사라집니다. 이메일 발송·실제 검증 요청은 체험 기능입니다.
+질문을 보내면 서버의 `POST /api/v1/chat`이 질문을 DB에 저장한 뒤 OpenAI Responses API를 호출합니다. 답변 저장 완료 후 다음 말풍선에 GPT 답변을 표시합니다. 이전에 완료된 대화는 서버가 DB에서 조회합니다. 로딩·오류 상태를 표시하며 실패한 질문은 다시 전송할 수 있습니다. DB 기록은 유지되지만 FO 화면의 새로고침 후 자동 복원은 아직 연결하지 않았습니다. 이메일 발송·실제 검증 요청은 체험 기능입니다.
 
 개발 중에는 질문 횟수 제한을 기본적으로 끕니다(`QUESTION_LIMIT_ENABLED=false`, 미설정 시에도 꺼짐). 화면에서 남은 횟수를 숨기고 3회 이후에도 계속 질문할 수 있습니다. 긴 대화에서는 최근 완료된 질문·답변 10쌍을 API 문맥으로 전달합니다. 오픈 시 루트 `.env`에 `QUESTION_LIMIT_ENABLED=true`를 설정하고 API를 재시작하면 세션당 3회 제한이 다시 적용됩니다. 비법률 질문도 포함하며 모델 호출 실패 시 횟수를 복구합니다. 동시 요청 차단은 제한 설정과 관계없이 유지합니다.
 
-새로고침해도 같은 쿠키 세션을 사용합니다. `새 대화 시작`은 `POST /api/v1/chat/session`으로 새 세션을 만듭니다. 현재 세션 카운터는 단일 API 프로세스 메모리에만 저장되어 서버 재시작 또는 24시간 만료 시 초기화됩니다. 운영용 DB 세션 저장은 후속 구현 범위입니다.
+새로고침해도 같은 쿠키 세션을 사용합니다. `새 대화 시작`은 `POST /api/v1/chat/session`으로 새 DB 세션을 만들고 이전 세션을 만료시킵니다. 실제 서버는 `chat_sessions`에 세션·카운터, `chat_messages`에 질문·답변을 저장합니다. 토큰은 해시로 저장하고 세션은 24시간 유효합니다. DB 기록은 재시작 후에도 유지됩니다. `GET /api/v1/chat/history`로 현재 세션 기록을 조회할 수 있으며 FO의 새로고침 후 화면 복원은 후속 작업입니다. DB 연결이 안 되면 채팅은 `DATABASE_UNAVAILABLE`로 실패하며 메모리 저장으로 대체하지 않습니다.
 
 AI 답변은 구조화된 `answer`, `isLegalQuestion`으로 받습니다. 현재 질문과 이전 문맥을 바탕으로 법률 여부를 판별하며, 법률 질문으로 확인된 완료 답변에만 변호사 검증 요청 버튼을 표시합니다. 비법률·판별 누락·거절·오류 응답에는 버튼을 표시하지 않습니다. 참고: [OpenAI 구조화된 출력](https://developers.openai.com/api/docs/guides/structured-outputs).
 
@@ -70,18 +70,17 @@ API의 로컬 설정은 `apps/api/src/server.config.ts`, Railway 배포 설정�
 
 ## 데이터베이스 준비
 
-Docker Desktop 또는 별도 PostgreSQL 서버가 필요합니다. 첫 화면 실행에는 DB가 필요하지 않습니다.
+Docker Desktop으로 PostgreSQL 17을 실행합니다. 설치부터 Railway 연결까지는 [DB 설정 안내](docs/database-setup.md)를 순서대로 진행하세요.
 
 ```powershell
-docker compose up -d postgres
-npm run db:generate
-npm run db:migrate
-npm run db:seed
+npm run db:up
+npm run db:setup
+npm run db:studio
 ```
 
-초기 migration은 `law_offices` 테이블만 생성합니다. 익명 세션·대화·검증·직원·입퇴사·휴가·배정 이력 테이블은 해당 API 구현 단계에서 추가합니다. DB가 없어도 health는 200을 반환하며 **DB 연결 정상 여부를 의미하지 않습니다**.
+누적 migration은 사무실·직원·변호사·채팅·검증·배정·답변·메일·감사 이력 등 16개 테이블을 생성합니다. `npm run test:db`는 Docker 없이 격리된 PostgreSQL 엔진에서 migration과 무결성을 검사합니다. 실제 연결은 `npm run db:check`로 확인합니다. DB가 없어도 health는 200을 반환하며 **DB 연결 정상 여부를 의미하지 않습니다**.
 
-로컬 개발용 DB 비밀번호만 Compose에 포함되어 있습니다. 운영 배포 시 별도 인증 정보·배포 구성이 필요합니다.
+Railway에 PostgreSQL 서비스를 만든 뒤 API의 `DATABASE_URL`을 참조하고 Config File을 `/apps/api/railway.database.json`으로 지정하면 Docker 빌드와 pre-deploy migration을 사용합니다. 채팅은 DB 연결이 필요합니다. 검증·BO UI의 업무 API 연결은 후속 구현 범위입니다.
 
 ## 검사
 
@@ -109,7 +108,7 @@ MCP 문서 조회와 FO의 GPT API 호출은 별개입니다. 실제 업무용 M
 
 ## 다음 구현
 
-1. FO: 익명 서버 세션·질문 제한·대화 DB 저장
+1. FO: 저장된 대화 화면 복원·중복 전송 방지와 실제 배포 DB 검증
 2. FO: 개인정보 마스킹·법률 분류 고도화
 3. FO: 질문 소유권 검증·이메일 수집·검증 요청 저장
 4. BO: 직원 인증·변호사·입퇴사·휴가 관리

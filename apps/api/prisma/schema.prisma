@@ -7,14 +7,440 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Initial development foundation. Chat and BO migrations follow in the next phase.
 model LawOffice {
-  id        String   @id @default(uuid()) @db.Uuid
-  code      String   @unique @db.VarChar(50)
-  name      String   @db.VarChar(200)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String       @id @default(uuid()) @db.Uuid
+  code         String       @unique @db.VarChar(50)
+  name         String       @db.VarChar(200)
+  isActive     Boolean      @default(true) @map("is_active")
+  contactEmail String?      @map("contact_email") @db.VarChar(254)
+  phone        String?      @db.VarChar(40)
+  status       OfficeStatus @default(ACTIVE)
+  settings     Json         @default("{}")
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  lawyers       Lawyer[]
+  staffAccounts StaffAccount[]
+  chatSessions  ChatSession[]
+  auditLogs     AuditLog[]
 
   @@map("law_offices")
+}
+
+enum OfficeStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum StaffRole {
+  OFFICE_ADMIN
+  DISPATCHER
+  LAWYER
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum EmploymentStatus {
+  SCHEDULED
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  CANCELLED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum MessageType {
+  USER_QUESTION
+  AI_ANSWER
+  NON_LEGAL_NOTICE
+  SYSTEM_NOTICE
+}
+
+enum ProcessingStatus {
+  RECEIVED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum VerificationStatus {
+  REQUESTED
+  ASSIGNED
+  REVIEWING
+  ANSWERED
+  EXPIRED
+  REJECTED
+}
+
+enum ReviewResult {
+  GENERALLY_VALID
+  PARTIALLY_VALID
+  IMPORTANT_OMISSION
+  MORE_FACTS_NEEDED
+  CONSULTATION_RECOMMENDED
+  AI_ANSWER_INAPPROPRIATE
+}
+
+enum EmailEventType {
+  LAWYER_REVIEW_INVITATION
+  USER_LAWYER_REPLY
+}
+
+enum EmailStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum AuditActorType {
+  ANONYMOUS_SESSION
+  STAFF
+  LAWYER_REVIEW_SESSION
+  SYSTEM
+}
+
+model Lawyer {
+  id                       String                @id @default(uuid()) @db.Uuid
+  lawOfficeId              String                @map("law_office_id") @db.Uuid
+  name                     String                @db.VarChar(100)
+  email                    String                @db.VarChar(254)
+  registrationNumber       String?               @map("registration_number") @db.VarChar(50)
+  approvalStatus           ApprovalStatus        @default(PENDING) @map("approval_status")
+  isActive                 Boolean               @default(true) @map("is_active")
+  assignmentEnabled        Boolean               @default(false) @map("assignment_enabled")
+  receiveVerificationEmail Boolean               @default(false) @map("receive_verification_email")
+  createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lawOffice                LawOffice             @relation(fields: [lawOfficeId], references: [id], onDelete: Restrict)
+  staffAccount             StaffAccount?
+  employments              LawyerEmployment[]
+  leaves                   LawyerLeave[]
+  assignedRequests         VerificationRequest[]
+  invitations              ReviewInvitation[]
+  previousAssignments      AssignmentHistory[]   @relation("PreviousLawyer")
+  nextAssignments          AssignmentHistory[]   @relation("NextLawyer")
+  replies                  LawyerReply[]
+
+  @@unique([lawOfficeId, id])
+  @@unique([lawOfficeId, email])
+  @@unique([lawOfficeId, registrationNumber])
+  @@index([lawOfficeId, approvalStatus, isActive, assignmentEnabled])
+  @@map("lawyers")
+}
+
+model StaffAccount {
+  id                 String              @id @default(uuid()) @db.Uuid
+  lawOfficeId        String              @map("law_office_id") @db.Uuid
+  lawyerId           String?             @unique @map("lawyer_id") @db.Uuid
+  email              String              @db.VarChar(254)
+  passwordHash       String              @map("password_hash") @db.VarChar(255)
+  role               StaffRole
+  status             AccountStatus       @default(ACTIVE)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lawOffice          LawOffice           @relation(fields: [lawOfficeId], references: [id], onDelete: Restrict)
+  lawyer             Lawyer?             @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
+  sessions           StaffSession[]
+  createdEmployments LawyerEmployment[]
+  approvedLeaves     LawyerLeave[]
+  assignments        AssignmentHistory[]
+
+  @@unique([lawOfficeId, id])
+  @@unique([lawOfficeId, email])
+  @@unique([lawOfficeId, lawyerId])
+  @@map("staff_accounts")
+}
+
+model StaffSession {
+  id             String       @id @default(uuid()) @db.Uuid
+  lawOfficeId    String       @map("law_office_id") @db.Uuid
+  staffAccountId String       @map("staff_account_id") @db.Uuid
+  tokenHash      String       @unique @map("token_hash") @db.VarChar(64)
+  expiresAt      DateTime     @map("expires_at") @db.Timestamptz(3)
+  revokedAt      DateTime?    @map("revoked_at") @db.Timestamptz(3)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  staffAccount   StaffAccount @relation(fields: [lawOfficeId, staffAccountId], references: [lawOfficeId, id], onDelete: Restrict)
+
+  @@index([lawOfficeId, staffAccountId, expiresAt])
+  @@map("staff_sessions")
+}
+
+model LawyerEmployment {
+  id          String           @id @default(uuid()) @db.Uuid
+  lawOfficeId String           @map("law_office_id") @db.Uuid
+  lawyerId    String           @map("lawyer_id") @db.Uuid
+  startsAt    DateTime         @map("starts_at") @db.Timestamptz(3)
+  endsAt      DateTime?        @map("ends_at") @db.Timestamptz(3)
+  status      EmploymentStatus @default(SCHEDULED)
+  createdBy   String           @map("created_by") @db.Uuid
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lawyer      Lawyer           @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
+  creator     StaffAccount     @relation(fields: [lawOfficeId, createdBy], references: [lawOfficeId, id], onDelete: Restrict)
+
+  @@index([lawOfficeId, lawyerId, startsAt, endsAt])
+  @@map("lawyer_employments")
+}
+
+model LawyerLeave {
+  id          String        @id @default(uuid()) @db.Uuid
+  lawOfficeId String        @map("law_office_id") @db.Uuid
+  lawyerId    String        @map("lawyer_id") @db.Uuid
+  startsAt    DateTime      @map("starts_at") @db.Timestamptz(3)
+  endsAt      DateTime      @map("ends_at") @db.Timestamptz(3)
+  status      LeaveStatus   @default(PENDING)
+  approvedBy  String?       @map("approved_by") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lawyer      Lawyer        @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
+  approver    StaffAccount? @relation(fields: [lawOfficeId, approvedBy], references: [lawOfficeId, id], onDelete: Restrict)
+
+  @@index([lawOfficeId, lawyerId, status, startsAt, endsAt])
+  @@map("lawyer_leaves")
+}
+
+model ChatSession {
+  id                   String                @id @default(uuid()) @db.Uuid
+  lawOfficeId          String                @map("law_office_id") @db.Uuid
+  sessionTokenHash     String                @unique @map("session_token_hash") @db.VarChar(64)
+  questionCount        Int                   @default(0) @map("question_count")
+  maxQuestionCount     Int?                  @default(3) @map("max_question_count")
+  expiresAt            DateTime              @map("expires_at") @db.Timestamptz(3)
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lawOffice            LawOffice             @relation(fields: [lawOfficeId], references: [id], onDelete: Restrict)
+  messages             ChatMessage[]
+  verificationRequests VerificationRequest[]
+
+  @@unique([lawOfficeId, id])
+  @@index([lawOfficeId, expiresAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id               String                @id @default(uuid()) @db.Uuid
+  lawOfficeId      String                @map("law_office_id") @db.Uuid
+  sessionId        String                @map("session_id") @db.Uuid
+  parentMessageId  String?               @map("parent_message_id") @db.Uuid
+  // Supplied by the client once per question, reused for retries; null for generated messages.
+  requestKey       String?               @map("request_key") @db.VarChar(100)
+  role             MessageRole
+  messageType      MessageType           @map("message_type")
+  content          String                @db.Text
+  sanitizedContent String?               @map("sanitized_content") @db.Text
+  sequenceNo       Int                   @map("sequence_no")
+  processingStatus ProcessingStatus      @default(RECEIVED) @map("processing_status")
+  metadata         Json                  @default("{}")
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  session          ChatSession           @relation(fields: [lawOfficeId, sessionId], references: [lawOfficeId, id], onDelete: Restrict)
+  parent           ChatMessage?          @relation("MessageParent", fields: [lawOfficeId, sessionId, parentMessageId], references: [lawOfficeId, sessionId, id], onDelete: Restrict, onUpdate: NoAction)
+  children         ChatMessage[]         @relation("MessageParent")
+  questionRequests VerificationRequest[] @relation("SelectedQuestion")
+  answerRequests   VerificationRequest[] @relation("SelectedAnswer")
+
+  @@unique([lawOfficeId, sessionId, id])
+  @@unique([lawOfficeId, sessionId, id, parentMessageId])
+  @@unique([sessionId, sequenceNo])
+  @@unique([sessionId, requestKey])
+  @@index([lawOfficeId, sessionId, parentMessageId])
+  @@index([lawOfficeId, processingStatus, createdAt])
+  @@map("chat_messages")
+}
+
+model VerificationRequest {
+  id                String              @id @default(uuid()) @db.Uuid
+  lawOfficeId       String              @map("law_office_id") @db.Uuid
+  sessionId         String              @map("session_id") @db.Uuid
+  questionMessageId String              @map("question_message_id") @db.Uuid
+  aiAnswerMessageId String              @unique @map("ai_answer_message_id") @db.Uuid
+  requesterEmail    String              @map("requester_email") @db.VarChar(254)
+  additionalContext String?             @map("additional_context") @db.Text
+  questionSnapshot  String              @map("question_snapshot") @db.Text
+  aiAnswerSnapshot  String              @map("ai_answer_snapshot") @db.Text
+  status            VerificationStatus  @default(REQUESTED)
+  assignedLawyerId  String?             @map("assigned_lawyer_id") @db.Uuid
+  assignmentVersion Int                 @default(0) @map("assignment_version")
+  requestedAt       DateTime            @default(now()) @map("requested_at") @db.Timestamptz(3)
+  assignedAt        DateTime?           @map("assigned_at") @db.Timestamptz(3)
+  claimedAt         DateTime?           @map("claimed_at") @db.Timestamptz(3)
+  completedAt       DateTime?           @map("completed_at") @db.Timestamptz(3)
+  expiresAt         DateTime            @map("expires_at") @db.Timestamptz(3)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  session           ChatSession         @relation(fields: [lawOfficeId, sessionId], references: [lawOfficeId, id], onDelete: Restrict)
+  question          ChatMessage         @relation("SelectedQuestion", fields: [lawOfficeId, sessionId, questionMessageId], references: [lawOfficeId, sessionId, id], onDelete: Restrict)
+  // Composite FK also guarantees that the chosen answer belongs to the chosen question.
+  aiAnswer          ChatMessage         @relation("SelectedAnswer", fields: [lawOfficeId, sessionId, aiAnswerMessageId, questionMessageId], references: [lawOfficeId, sessionId, id, parentMessageId], onDelete: Restrict)
+  assignedLawyer    Lawyer?             @relation(fields: [lawOfficeId, assignedLawyerId], references: [lawOfficeId, id], onDelete: Restrict)
+  invitations       ReviewInvitation[]
+  assignments       AssignmentHistory[]
+  reply             LawyerReply?
+  emailJobs         EmailOutbox[]
+
+  @@unique([lawOfficeId, id])
+  @@index([lawOfficeId, status, requestedAt])
+  @@index([lawOfficeId, assignedLawyerId, status, expiresAt])
+  @@index([lawOfficeId, sessionId])
+  @@map("verification_requests")
+}
+
+model ReviewInvitation {
+  id                    String              @id @default(uuid()) @db.Uuid
+  lawOfficeId           String              @map("law_office_id") @db.Uuid
+  verificationRequestId String              @map("verification_request_id") @db.Uuid
+  lawyerId              String              @map("lawyer_id") @db.Uuid
+  assignmentVersion     Int                 @map("assignment_version")
+  tokenHash             String              @unique @map("token_hash") @db.VarChar(64)
+  expiresAt             DateTime            @map("expires_at") @db.Timestamptz(3)
+  revokedAt             DateTime?           @map("revoked_at") @db.Timestamptz(3)
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  request               VerificationRequest @relation(fields: [lawOfficeId, verificationRequestId], references: [lawOfficeId, id], onDelete: Restrict)
+  lawyer                Lawyer              @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
+  sessions              ReviewSession[]
+  emailJobs             EmailOutbox[]
+
+  @@unique([lawOfficeId, verificationRequestId, id])
+  @@unique([verificationRequestId, assignmentVersion, lawyerId])
+  @@index([lawOfficeId, lawyerId, expiresAt])
+  @@map("review_invitations")
+}
+
+model ReviewSession {
+  id                    String           @id @default(uuid()) @db.Uuid
+  lawOfficeId           String           @map("law_office_id") @db.Uuid
+  verificationRequestId String           @map("verification_request_id") @db.Uuid
+  invitationId          String           @map("invitation_id") @db.Uuid
+  tokenHash             String           @unique @map("token_hash") @db.VarChar(64)
+  expiresAt             DateTime         @map("expires_at") @db.Timestamptz(3)
+  revokedAt             DateTime?        @map("revoked_at") @db.Timestamptz(3)
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  invitation            ReviewInvitation @relation(fields: [lawOfficeId, verificationRequestId, invitationId], references: [lawOfficeId, verificationRequestId, id], onDelete: Restrict)
+
+  @@index([lawOfficeId, verificationRequestId, expiresAt])
+  @@map("review_sessions")
+}
+
+model AssignmentHistory {
+  id                    String              @id @default(uuid()) @db.Uuid
+  lawOfficeId           String              @map("law_office_id") @db.Uuid
+  verificationRequestId String              @map("verification_request_id") @db.Uuid
+  assignmentVersion     Int                 @map("assignment_version")
+  fromLawyerId          String?             @map("from_lawyer_id") @db.Uuid
+  toLawyerId            String?             @map("to_lawyer_id") @db.Uuid
+  reason                String              @db.Text
+  actorStaffId          String?             @map("actor_staff_id") @db.Uuid
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  request               VerificationRequest @relation(fields: [lawOfficeId, verificationRequestId], references: [lawOfficeId, id], onDelete: Restrict)
+  fromLawyer            Lawyer?             @relation("PreviousLawyer", fields: [lawOfficeId, fromLawyerId], references: [lawOfficeId, id], onDelete: Restrict)
+  toLawyer              Lawyer?             @relation("NextLawyer", fields: [lawOfficeId, toLawyerId], references: [lawOfficeId, id], onDelete: Restrict)
+  actor                 StaffAccount?       @relation(fields: [lawOfficeId, actorStaffId], references: [lawOfficeId, id], onDelete: Restrict)
+
+  @@unique([verificationRequestId, assignmentVersion])
+  @@index([lawOfficeId, createdAt])
+  @@map("assignment_history")
+}
+
+model LawyerReply {
+  id                    String              @id @default(uuid()) @db.Uuid
+  lawOfficeId           String              @map("law_office_id") @db.Uuid
+  verificationRequestId String              @unique @map("verification_request_id") @db.Uuid
+  lawyerId              String              @map("lawyer_id") @db.Uuid
+  assignmentVersion     Int                 @map("assignment_version")
+  resultType            ReviewResult        @map("result_type")
+  replyBody             String              @map("reply_body") @db.Text
+  submittedAt           DateTime            @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  request               VerificationRequest @relation(fields: [lawOfficeId, verificationRequestId], references: [lawOfficeId, id], onDelete: Restrict)
+  lawyer                Lawyer              @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
+  emailJobs             EmailOutbox[]
+
+  @@unique([lawOfficeId, verificationRequestId])
+  @@unique([lawOfficeId, verificationRequestId, id])
+  @@index([lawOfficeId, lawyerId, submittedAt])
+  @@map("lawyer_replies")
+}
+
+model EmailOutbox {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  lawOfficeId           String                 @map("law_office_id") @db.Uuid
+  verificationRequestId String                 @map("verification_request_id") @db.Uuid
+  invitationId          String?                @map("invitation_id") @db.Uuid
+  replyId               String?                @map("reply_id") @db.Uuid
+  recipient             String                 @db.VarChar(254)
+  eventType             EmailEventType         @map("event_type")
+  deduplicationKey      String                 @unique @map("deduplication_key") @db.VarChar(200)
+  status                EmailStatus            @default(PENDING)
+  attemptCount          Int                    @default(0) @map("attempt_count")
+  nextAttemptAt         DateTime               @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  leaseUntil            DateTime?              @map("lease_until") @db.Timestamptz(3)
+  providerMessageId     String?                @map("provider_message_id") @db.VarChar(255)
+  lastErrorCode         String?                @map("last_error_code") @db.VarChar(100)
+  // Authenticated encryption payload only; never a raw invitation URL/token.
+  encryptedPayload      Bytes?                 @map("encrypted_payload")
+  sentAt                DateTime?              @map("sent_at") @db.Timestamptz(3)
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  request               VerificationRequest    @relation(fields: [lawOfficeId, verificationRequestId], references: [lawOfficeId, id], onDelete: Restrict)
+  invitation            ReviewInvitation?      @relation(fields: [lawOfficeId, verificationRequestId, invitationId], references: [lawOfficeId, verificationRequestId, id], onDelete: Restrict)
+  reply                 LawyerReply?           @relation(fields: [lawOfficeId, verificationRequestId, replyId], references: [lawOfficeId, verificationRequestId, id], onDelete: Restrict)
+  attempts              EmailDeliveryAttempt[]
+
+  @@unique([lawOfficeId, id])
+  @@index([status, nextAttemptAt, leaseUntil])
+  @@index([lawOfficeId, verificationRequestId, createdAt])
+  @@map("email_outbox")
+}
+
+model EmailDeliveryAttempt {
+  id                String      @id @default(uuid()) @db.Uuid
+  lawOfficeId       String      @map("law_office_id") @db.Uuid
+  emailOutboxId     String      @map("email_outbox_id") @db.Uuid
+  attemptNo         Int         @map("attempt_no")
+  status            EmailStatus
+  providerMessageId String?     @map("provider_message_id") @db.VarChar(255)
+  errorCode         String?     @map("error_code") @db.VarChar(100)
+  startedAt         DateTime    @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt        DateTime?   @map("finished_at") @db.Timestamptz(3)
+  outbox            EmailOutbox @relation(fields: [lawOfficeId, emailOutboxId], references: [lawOfficeId, id], onDelete: Restrict)
+
+  @@unique([emailOutboxId, attemptNo])
+  @@index([lawOfficeId, startedAt])
+  @@map("email_delivery_attempts")
+}
+
+model AuditLog {
+  id          String         @id @default(uuid()) @db.Uuid
+  lawOfficeId String         @map("law_office_id") @db.Uuid
+  actorType   AuditActorType @map("actor_type")
+  actorId     String?        @map("actor_id") @db.Uuid
+  action      String         @db.VarChar(100)
+  entityType  String         @map("entity_type") @db.VarChar(100)
+  entityId    String         @map("entity_id") @db.Uuid
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  lawOffice   LawOffice      @relation(fields: [lawOfficeId], references: [id], onDelete: Restrict)
+
+  @@index([lawOfficeId, entityType, entityId, createdAt])
+  @@index([lawOfficeId, actorType, actorId, createdAt])
+  @@map("audit_logs")
 }
