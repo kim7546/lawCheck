@@ -30,7 +30,17 @@ npm run dev
 - TypeScript strict, ESLint, API 테스트, 데스크톱·모바일 Playwright 테스트
 - 개발용 OpenAI Docs MCP 설정 예시
 
-**첫 화면은 명시적인 체험 모드입니다.** 질문의 답변은 동일한 고정 예시이며 GPT가 생성하지 않습니다. 질문과 폼 입력은 React 메모리에만 있고 서버나 브라우저 저장소에 저장되지 않습니다. 새로고침 시 사라집니다. 이메일 발송·실제 검증 요청·인사 데이터·직원 인증은 아직 구현하지 않았습니다. API는 실제 접수처럼 보이는 가짜 성공 응답을 제공하지 않습니다.
+질문을 보내면 서버의 `POST /api/v1/chat`이 OpenAI Responses API를 호출하고 다음 말풍선에 GPT 답변을 표시합니다. 이전에 완료된 대화도 함께 전달합니다. 로딩·오류 상태를 표시하며 실패한 질문은 다시 전송할 수 있습니다. 대화는 React 메모리에만 유지되며 새로고침 시 사라집니다. 이메일 발송·실제 검증 요청은 체험 기능입니다.
+
+개발 중에는 질문 횟수 제한을 기본적으로 끕니다(`QUESTION_LIMIT_ENABLED=false`, 미설정 시에도 꺼짐). 화면에서 남은 횟수를 숨기고 3회 이후에도 계속 질문할 수 있습니다. 긴 대화에서는 최근 완료된 질문·답변 10쌍을 API 문맥으로 전달합니다. 오픈 시 루트 `.env`에 `QUESTION_LIMIT_ENABLED=true`를 설정하고 API를 재시작하면 세션당 3회 제한이 다시 적용됩니다. 비법률 질문도 포함하며 모델 호출 실패 시 횟수를 복구합니다. 동시 요청 차단은 제한 설정과 관계없이 유지합니다.
+
+새로고침해도 같은 쿠키 세션을 사용합니다. `새 대화 시작`은 `POST /api/v1/chat/session`으로 새 세션을 만듭니다. 현재 세션 카운터는 단일 API 프로세스 메모리에만 저장되어 서버 재시작 또는 24시간 만료 시 초기화됩니다. 운영용 DB 세션 저장은 후속 구현 범위입니다.
+
+AI 답변은 구조화된 `answer`, `isLegalQuestion`으로 받습니다. 현재 질문과 이전 문맥을 바탕으로 법률 여부를 판별하며, 법률 질문으로 확인된 완료 답변에만 변호사 검증 요청 버튼을 표시합니다. 비법률·판별 누락·거절·오류 응답에는 버튼을 표시하지 않습니다. 참고: [OpenAI 구조화된 출력](https://developers.openai.com/api/docs/guides/structured-outputs).
+
+루트 `.env`에 `OPENAI_API_KEY`를 설정하고 API 서버를 재시작하세요. `OPENAI_ANSWER_MODEL` 기본값은 `gpt-4.1-mini`입니다. 키는 서버에서만 사용합니다. 키가 없거나 호출이 실패하면 오류 안내를 표시합니다. 대화는 OpenAI에 전송되며 `store: false`를 지정합니다. DB 변경은 없습니다.
+
+구현 참고: [OpenAI 텍스트 생성 문서](https://developers.openai.com/api/docs/guides/text).
 
 기본 사무실명 `법률사무소 IBS`은 샘플입니다. `.env`의 `LAW_OFFICE_NAME` 변경 후 API를 재시작하면 FO에 반영됩니다. API가 꺼진 경우에도 샘플 첫 화면을 열 수 있습니다.
 
@@ -81,7 +91,7 @@ npm run build
 npm run test:e2e
 ```
 
-Playwright 테스트는 Windows에 설치된 Microsoft Edge를 사용합니다. 다른 환경에서는 `playwright.config.ts`의 `channel`을 제거하고 `npx playwright install chromium`을 실행하세요. 데스크톱과 모바일 크기에서 질문·검증 체험·대화 초기화·개인정보 비전송을 검사합니다.
+Playwright 테스트는 Windows에 설치된 Microsoft Edge를 사용합니다. 다른 환경에서는 `playwright.config.ts`의 `channel`을 제거하고 `npx playwright install chromium`을 실행하세요. 데스크톱과 모바일 크기에서 질문·검증 체험·대화 초기화·API 요청·실패 후 재시도를 검사합니다.
 
 Prisma CLI·Client는 초기 schema 문법과 호환되는 동일 버전으로 고정합니다. 버전을 올릴 때 schema validate/generate와 의존성 감사 결과를 함께 확인합니다.
 
@@ -98,7 +108,7 @@ MCP 문서 조회와 FO의 GPT API 호출은 별개입니다. 실제 업무용 M
 ## 다음 구현
 
 1. FO: 익명 서버 세션·질문 제한·대화 DB 저장
-2. FO: 개인정보 마스킹·법률 분류·실제 GPT 답변
+2. FO: 개인정보 마스킹·법률 분류 고도화
 3. FO: 질문 소유권 검증·이메일 수집·검증 요청 저장
 4. BO: 직원 인증·변호사·입퇴사·휴가 관리
 5. BO: 배정·재배정·토큰 답변·outbox 이메일 발송

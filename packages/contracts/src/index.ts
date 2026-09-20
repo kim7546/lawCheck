@@ -7,6 +7,8 @@ export interface PublicConfig {
   officeName: string;
   mode: 'prototype';
   maxQuestions: number;
+  questionLimitEnabled: boolean;
+  remainingQuestions?: number | null;
 }
 
 export interface ChatTurn {
@@ -14,4 +16,20 @@ export interface ChatTurn {
   question: string;
   answer: string;
   requested: boolean;
+  isLegalQuestion?: boolean;
+  status?: 'pending' | 'complete' | 'error';
 }
+
+export interface ChatRequest {
+  question: string;
+  history: { question: string; answer: string }[];
+}
+
+export interface ChatAnswer {
+  answer: string;
+  isLegalQuestion: boolean;
+}
+
+export type ChatResponse =
+  | { success: true; data: ChatAnswer & { remainingQuestions?: number | null } }
+  | { success: false; error: { code: string; message: string } };

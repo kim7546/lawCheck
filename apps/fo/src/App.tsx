@@ -23,7 +23,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import type { ChatTurn, PublicConfig } from '@lawcheck/contracts';
+import type { ChatResponse, ChatTurn, PublicConfig } from '@lawcheck/contracts';
 
 const topics = [
   {
@@ -54,7 +54,8 @@ const topics = [
 const defaultConfig: PublicConfig = {
   officeName: '법률사무소 IBS',
   mode: 'prototype',
-  maxQuestions: 5,
+  maxQuestions: 3,
+  questionLimitEnabled: false,
 };
 type InfoPanel = 'guide' | 'privacy' | 'notice' | null;
 
@@ -119,28 +120,47 @@ export default function App() {
   const [consent, setConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [quota, setQuota] = useState(3);
+  const [resetError, setResetError] = useState('');
+  const [resetting, setResetting] = useState(false);
   const composer = useRef<HTMLTextAreaElement>(null);
-  const conversationEnd = useRef<HTMLDivElement>(null);
+  const latestTurn = useRef<HTMLElement>(null);
   const drawer = useRef<HTMLDialogElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const remaining = Math.max(0, config.maxQuestions - turns.length);
+  const activeRequest = useRef<AbortController | null>(null);
+  const remaining = Math.max(0, quota - (loading ? 1 : 0));
+  const limitReached = config.questionLimitEnabled && remaining === 0;
+  const latestTurnId = turns.at(-1)?.id;
+  const latestTurnStatus = turns.at(-1)?.status;
 
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/v1/config', { signal: controller.signal })
       .then((response) => (response.ok ? response.json() : null))
       .then((body) => {
-        if (body?.data?.mode === 'prototype') setConfig(body.data);
+        if (body?.data?.mode === 'prototype') {
+          setConfig(body.data);
+          setQuota(body.data.remainingQuestions ?? 3);
+        }
       })
       .catch(() => {});
     return () => {
       controller.abort();
-      if (timer.current) clearTimeout(timer.current);
+      activeRequest.current?.abort();
+      activeRequest.current = null;
     };
   }, []);
   useEffect(() => {
-    if (turns.length) conversationEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [turns, loading]);
+    if (!latestTurnId) return;
+    const frame = requestAnimationFrame(() => {
+      latestTurn.current?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'instant'
+          : 'smooth',
+        block: 'start',
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [latestTurnId, latestTurnStatus]);
   useEffect(() => {
     if (selectedTurn) drawer.current?.showModal();
     else drawer.current?.close();
@@ -150,10 +170,25 @@ export default function App() {
     setQuestion(prompt);
     composer.current?.focus();
   }
-  function reset() {
-    if (timer.current) clearTimeout(timer.current);
+  async function reset() {
+    if (resetting) return;
+    setResetting(true);
+    setResetError('');
+    try {
+      const response = await fetch('/api/v1/chat/session', { method: 'POST' });
+      if (!response.ok) throw new Error();
+    } catch {
+      setResetError('새 대화를 시작하지 못했어요. 다시 시도해 주세요.');
+      setResetting(false);
+      return;
+    }
+    activeRequest.current?.abort();
+    activeRequest.current = null;
     setLoading(false);
     setTurns([]);
+    setQuota(3);
+    setSelectedTurn(null);
+    setResetting(false);
     setQuestion('');
     setShowReset(false);
     setMobileNav(false);
@@ -161,30 +196,78 @@ export default function App() {
   }
   function newConversation() {
     setMobileNav(false);
-    if (turns.length || question || loading) setShowReset(true);
+    if (turns.length || question || loading || quota < 3) setShowReset(true);
     else composer.current?.focus();
   }
-  function sendQuestion(event: FormEvent) {
+  async function sendQuestion(event: FormEvent) {
     event.preventDefault();
-    if (!question.trim() || loading || !remaining) return;
+    if (!question.trim() || activeRequest.current || limitReached) return;
     const text = question.trim();
+    const id = crypto.randomUUID();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 70000);
+    const history = turns
+      .filter((turn) => turn.status === 'complete')
+      .slice(-10)
+      .map(({ question, answer }) => ({ question, answer }));
     setQuestion('');
     setLoading(true);
-    timer.current = setTimeout(() => {
-      setTurns((previous) => [
-        ...previous,
-        {
-          id: crypto.randomUUID(),
-          question: text,
-          requested: false,
-          answer:
-            '상황을 차근차근 정리하는 것부터 시작해 볼까요?\n\n문제가 발생한 날짜와 상대방과 나눈 대화, 관련 문서가 있는지 정리해 두면 상담을 준비하는 데 도움이 됩니다. 구체적인 판단은 사실관계와 자료를 확인한 뒤 변호사와 함께 검토해 주세요.\n\n이 답변은 화면 체험을 위한 고정된 예시이며, 입력하신 질문을 GPT가 분석한 결과가 아닙니다.',
-        },
-      ]);
-      setLoading(false);
-    }, 650);
+    setTurns((previous) => [
+      ...previous,
+      { id, question: text, requested: false, answer: '', status: 'pending' },
+    ]);
+    try {
+      const response = await fetch('/api/v1/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: text, history }),
+        signal: controller.signal,
+      });
+      const body: ChatResponse = await response.json();
+      if (!body.success) {
+        if (body.error.code === 'QUESTION_LIMIT_REACHED') setQuota(0);
+        throw new Error(body.error.message);
+      }
+      if (!response.ok || !body.data?.answer?.trim())
+        throw new Error('답변을 받지 못했어요. 다시 시도해 주세요.');
+      if (activeRequest.current !== controller) return;
+      setQuota((previous) => body.data.remainingQuestions ?? Math.max(0, previous - 1));
+      setTurns((previous) =>
+        previous.map((turn) =>
+          turn.id === id
+            ? {
+                ...turn,
+                answer: body.data.answer,
+                isLegalQuestion: body.data.isLegalQuestion === true,
+                status: 'complete',
+              }
+            : turn,
+        ),
+      );
+    } catch (error) {
+      if (activeRequest.current !== controller) return;
+      const message = controller.signal.aborted
+        ? '답변 시간이 길어지고 있어요. 다시 시도해 주세요.'
+        : error instanceof Error && !(error instanceof SyntaxError) && !(error instanceof TypeError)
+          ? error.message
+          : '서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.';
+      setTurns((previous) =>
+        previous.map((turn) =>
+          turn.id === id ? { ...turn, answer: message, status: 'error' } : turn,
+        ),
+      );
+      setQuestion(text);
+    } finally {
+      clearTimeout(timeout);
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+        setLoading(false);
+      }
+    }
   }
   function openVerification(turn: ChatTurn) {
+    if (turn.status !== 'complete' || turn.isLegalQuestion !== true) return;
     setEmail('');
     setConsent(false);
     setSubmitted(false);
@@ -373,10 +456,15 @@ export default function App() {
                   <span /> YOUR FIRST STEP
                 </span>
                 <h1>함께 정리해 볼게요.</h1>
-                <p>실제 상담 전, 화면의 흐름을 체험하고 있어요.</p>
+                <p>질문을 바탕으로 AI가 답변을 정리해 드려요.</p>
               </div>
               {turns.map((turn) => (
-                <article className="turn" id={turn.id} key={turn.id}>
+                <article
+                  className="turn"
+                  id={turn.id}
+                  key={turn.id}
+                  ref={turn.id === latestTurnId ? latestTurn : undefined}
+                >
                   <div className="user-message">{turn.question}</div>
                   <div className="assistant-message">
                     <span className="assistant-avatar">
@@ -384,29 +472,25 @@ export default function App() {
                     </span>
                     <div className="assistant-body">
                       <div className="assistant-name">
-                        lawCheck <span>예시 답변</span>
+                        lawCheck <span>{turn.status === 'error' ? '연결 안내' : 'AI 답변'}</span>
                       </div>
-                      <p>{turn.answer}</p>
-                      <button
-                        className={`verify-button ${turn.requested ? 'requested' : ''}`}
-                        onClick={() => openVerification(turn)}
-                      >
-                        {turn.requested ? <Check size={16} /> : <ShieldCheck size={16} />}
-                        {turn.requested ? '검증 요청 체험 완료' : '변호사에게 검증 요청'}
-                        <ArrowRight size={15} />
-                      </button>
+                      <p role={turn.status === 'error' ? 'alert' : undefined}>
+                        {turn.status === 'pending' ? 'AI가 답변을 준비하고 있어요…' : turn.answer}
+                      </p>
+                      {turn.status === 'complete' && turn.isLegalQuestion === true && (
+                        <button
+                          className={`verify-button ${turn.requested ? 'requested' : ''}`}
+                          onClick={() => openVerification(turn)}
+                        >
+                          {turn.requested ? <Check size={16} /> : <ShieldCheck size={16} />}
+                          {turn.requested ? '검증 요청 체험 완료' : '변호사에게 검증 요청'}
+                          <ArrowRight size={15} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </article>
               ))}
-              {loading && (
-                <div className="loading-answer">
-                  <Sparkles size={18} />
-                  <span>예시 답변을 준비하고 있어요</span>
-                  <span className="loading-dots">···</span>
-                </div>
-              )}
-              <div ref={conversationEnd} />
             </section>
           )}
 
@@ -420,18 +504,23 @@ export default function App() {
                 ref={composer}
                 value={question}
                 maxLength={2000}
-                disabled={loading || !remaining}
+                disabled={loading || limitReached}
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder={
-                  remaining
+                  !limitReached
                     ? '지금 겪고 있는 상황이나 궁금한 점을 자유롭게 적어주세요.'
                     : '이번 대화의 체험 횟수를 모두 사용했어요. 새 대화를 시작해 주세요.'
                 }
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                    event.preventDefault();
-                    event.currentTarget.form?.requestSubmit();
-                  }
+                  if (
+                    event.key !== 'Enter' ||
+                    event.shiftKey ||
+                    event.nativeEvent.isComposing ||
+                    event.nativeEvent.keyCode === 229
+                  )
+                    return;
+                  event.preventDefault();
+                  if (!event.repeat) event.currentTarget.form?.requestSubmit();
                 }}
               />
               <div className="composer-toolbar">
@@ -439,16 +528,18 @@ export default function App() {
                   <Sparkles size={15} />
                   법률 AI
                   <span className="mode-divider" />
-                  예시 체험
+                  GPT 연결
                 </span>
                 <div className="composer-actions">
-                  <span className="remaining">
-                    남은 질문 <b>{remaining}</b> / {config.maxQuestions}
-                  </span>
+                  {config.questionLimitEnabled && (
+                    <span className="remaining">
+                      남은 질문 <b>{remaining}</b> / {config.maxQuestions}
+                    </span>
+                  )}
                   <button
                     type="submit"
                     className="send-button"
-                    disabled={!question.trim() || loading || !remaining}
+                    disabled={!question.trim() || loading || limitReached}
                     aria-label="질문 보내기"
                   >
                     <ArrowUp size={21} />
@@ -509,7 +600,9 @@ export default function App() {
               않습니다.
             </p>
             <div>
-              <span className="demo-label">체험 화면 · 실제 AI 응답 및 이메일 발송 전</span>
+              <span className="demo-label">
+                AI 답변 제공 · 검증 요청 및 이메일 발송은 체험 기능
+              </span>
               <nav>
                 <button onClick={() => setInfo('privacy')}>개인정보 안내</button>
                 <span>·</span>
@@ -568,8 +661,9 @@ export default function App() {
           ) : info === 'privacy' ? (
             <div className="info-prose">
               <p>
-                현재 체험 화면에서 입력한 질문과 이메일은 서버로 전송하거나 브라우저 저장소에
-                보관하지 않습니다. 새로고침하면 대화가 사라집니다.
+                질문과 앞선 대화는 답변 생성을 위해 서버를 거쳐 OpenAI로 전송됩니다. 이 앱의 DB나
+                브라우저 저장소에는 보관하지 않으며 새로고침하면 대화가 사라집니다. 검증 요청 체험에
+                입력한 이메일은 전송하지 않습니다.
               </p>
               <p>
                 정식 서비스에서는 질문과 AI 답변을 무기명으로 저장하고, 검증을 요청한 질문에 한해
@@ -583,8 +677,8 @@ export default function App() {
                 lawCheck의 첫 화면과 질문·검증 요청 흐름을 확인할 수 있는 개발용 미리보기입니다.
               </p>
               <p>
-                답변은 미리 작성된 공통 예시입니다. GPT 분석, DB 대화 저장, 변호사 배정, 이메일
-                발송은 아직 연결되지 않았습니다.
+                답변은 GPT API로 생성됩니다. DB 대화 저장, 변호사 배정, 이메일 발송은 아직 연결되지
+                않았습니다.
               </p>
               <p>표시된 사무실명은 예시이며 실제 상담 접수를 의미하지 않습니다.</p>
             </div>
@@ -600,7 +694,8 @@ export default function App() {
             <button className="secondary-button" onClick={() => setShowReset(false)}>
               계속 대화하기
             </button>
-            <button className="primary-button" onClick={reset}>
+            {resetError && <p role="alert">{resetError}</p>}
+            <button className="primary-button" onClick={reset} disabled={resetting}>
               새 대화 시작
             </button>
           </div>
