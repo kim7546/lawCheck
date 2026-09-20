@@ -474,8 +474,28 @@ export default function App() {
                       <div className="assistant-name">
                         lawCheck <span>{turn.status === 'error' ? '연결 안내' : 'AI 답변'}</span>
                       </div>
-                      <p role={turn.status === 'error' ? 'alert' : undefined}>
-                        {turn.status === 'pending' ? 'AI가 답변을 준비하고 있어요…' : turn.answer}
+                      <p
+                        className={turn.status === 'pending' ? 'typing-bubble' : undefined}
+                        role={
+                          turn.status === 'pending'
+                            ? 'status'
+                            : turn.status === 'error'
+                              ? 'alert'
+                              : undefined
+                        }
+                        aria-label={
+                          turn.status === 'pending' ? 'AI가 답변을 준비하고 있어요' : undefined
+                        }
+                      >
+                        {turn.status === 'pending' ? (
+                          <span className="typing-indicator" aria-hidden="true">
+                            <span />
+                            <span />
+                            <span />
+                          </span>
+                        ) : (
+                          turn.answer
+                        )}
                       </p>
                       {turn.status === 'complete' && turn.isLegalQuestion === true && (
                         <button

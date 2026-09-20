@@ -31,7 +31,7 @@ test('keyboard submission preserves composition and scrolls to the newest questi
   await input.fill('어떤 서류가 필요한가요?');
   await input.press('Enter');
   await expect(input).toHaveValue('');
-  await expect(page.getByText('AI가 답변을 준비하고 있어요…')).toBeVisible();
+  await expect(page.getByRole('status', { name: 'AI가 답변을 준비하고 있어요' })).toBeVisible();
   const newest = page.locator('.turn').last();
   const question = newest.locator('.user-message');
   await expect(question).toBeInViewport({ ratio: 1 });
@@ -116,10 +116,18 @@ test('pending question appears immediately, reply follows and history is sent', 
   await page.getByRole('textbox', { name: '법률 질문' }).press('Enter');
   await expect(page.getByRole('textbox', { name: '법률 질문' })).toHaveValue('');
   await expect(page.locator('.user-message')).toHaveText('첫 질문');
-  await expect(page.getByText('AI가 답변을 준비하고 있어요…')).toBeVisible();
+  await expect(page.getByRole('status', { name: 'AI가 답변을 준비하고 있어요' })).toBeVisible();
+  const dots = page.locator('.typing-indicator > span');
+  await expect(dots).toHaveCount(3);
+  await expect(dots.first()).toHaveCSS('animation-name', 'typing-dot');
+  await expect(dots.nth(1)).toHaveCSS('animation-delay', '0.15s');
+  await expect(dots.nth(2)).toHaveCSS('animation-delay', '0.3s');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(dots.first()).toHaveCSS('animation-name', 'none');
   await expect(page.getByRole('button', { name: '질문 보내기' })).toBeDisabled();
   finish();
   await expect(page.locator('.assistant-body > p')).toHaveText('첫 답변\n다음 줄');
+  await expect(page.locator('.typing-indicator')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: '법률 질문' })).toHaveValue('');
   await page.getByRole('textbox', { name: '법률 질문' }).fill('후속 질문');
   await page.getByRole('button', { name: '질문 보내기' }).click();

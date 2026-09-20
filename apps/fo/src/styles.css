@@ -812,17 +812,33 @@ svg {
 .verify-button.requested {
   color: #829272;
 }
-.loading-answer {
-  display: flex;
+.assistant-body > p.typing-bubble {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 30px 0;
-  color: #748e63;
-  font-size: 12px;
+  min-height: 44px;
+  padding: 14px 18px;
+  border: 1px solid #e2e8dc;
+  border-radius: 3px 14px 14px;
+  background: #f0f4eb;
 }
-.loading-dots {
-  animation: pulse 1s infinite;
-  font-size: 24px;
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 14px;
+}
+.typing-indicator > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #748e63;
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+.typing-indicator > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-indicator > span:nth-child(3) {
+  animation-delay: 0.3s;
 }
 .has-conversation .composer-section {
   position: sticky;
@@ -836,9 +852,16 @@ svg {
 .has-conversation .main-footer {
   margin-top: 20px;
 }
-@keyframes pulse {
-  50% {
-    opacity: 0.3;
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
   }
 }
 /* Native dialogs provide focus containment and keyboard dismissal. */
