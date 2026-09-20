@@ -1,4 +1,4 @@
-# Railway 체험 화면 배포
+# Railway FO·BO·API 배포
 
 FO와 BO는 개발용 `vite.config.ts`와 배포 확인용 `vite.preview.config.ts`를 분리합니다.
 
@@ -43,9 +43,71 @@ API를 연결하지 않아도 체험 화면은 기본 사무소명으로 열립�
 `API_PROXY_TARGET` 미설정 시 개발용 API로 요청을 전달하지 않습니다.
 이 변수는 서버 측 프록시 설정이며 브라우저에 주입하지 않습니다.
 
-API를 별도 Railway 서비스로 연결하려면 API 서버도 `0.0.0.0` 및 해당 서비스의 `PORT`로
-실행되어야 합니다. 현재 API의 로컬 전용 바인딩은 별도 변경이 필요합니다.
-FO의 `PORT`를 API 서비스에 그대로 복사할 필요는 없습니다.
+## API 서비스
+
+API도 로컬 개발과 Railway 배포 설정을 분리합니다.
+
+| 항목      | 로컬 개발·IntelliJ 디버그       | Railway 배포                            |
+| --------- | ------------------------------- | --------------------------------------- |
+| 설정 파일 | `apps/api/src/server.config.ts` | `apps/api/src/server.deploy.config.ts`  |
+| 진입 파일 | `apps/api/src/server.ts`        | 빌드된 `apps/api/dist/server.deploy.js` |
+| 바인딩    | `127.0.0.1`                     | `0.0.0.0`                               |
+| 포트      | 루트 `.env`의 `PORT`, 기본 4000 | Railway `PORT`, 미설정 시 4000          |
+| 환경변수  | 루트 `.env` 로드                | 실행 환경변수만 사용                    |
+| 시작 명령 | `npm run dev -w @lawcheck/api`  | `npm run start -w @lawcheck/api`        |
+
+API 서비스의 **Settings → Config as Code → Railway Config File**을 `/apps/api/railway.json`으로 지정합니다.
+Root Directory는 비워두거나 `/`로 설정하여 저장소 루트에서 npm workspace를 사용합니다.
+`apps/api`를 Root Directory로 지정하면 공통 패키지와 루트 잠금 파일을 사용할 수 없습니다.
+이 설정 파일은 API 서비스에만 지정합니다. FO·BO에는 기존 설정을 사용합니다.
+
+| Railway 설정        | 값                               |
+| ------------------- | -------------------------------- |
+| Config File         | `/apps/api/railway.json`         |
+| Root Directory      | 저장소 루트 (`/`)                |
+| Build Command       | `npm run build -w @lawcheck/api` |
+| Start Command       | `npm run start -w @lawcheck/api` |
+| Pre-deploy Command  | 비워두기                         |
+| Healthcheck Path    | `/api/v1/health`                 |
+| Healthcheck Timeout | 60초                             |
+
+빌드·시작 명령과 healthcheck는 `railway.json`에 포함되어 있습니다.
+Railway Variables에는 아래 값을 설정합니다. 예시는 `apps/api/.env.example`에도 있습니다.
+
+```dotenv
+NODE_ENV=production
+PORT=4000
+LAW_OFFICE_NAME=법률사무소 IBS
+OPENAI_API_KEY=발급받은_API_키
+OPENAI_ANSWER_MODEL=gpt-4.1-mini
+QUESTION_LIMIT_ENABLED=false
+```
+
+`PORT=4000`을 직접 지정한다면 API 공개 도메인의 Target port도 `4000`으로 맞춥니다.
+Railway 자동 할당 `PORT`를 사용해도 되지만 Target port와 실제 리스닝 포트가 일치해야 합니다.
+FO의 포트와 API 포트는 서로 달라도 됩니다. 모델은 사용하려는 모델 ID로 지정합니다.
+`.env.example`은 참고용이며 배포 서버가 자동으로 읽지 않습니다. 비밀 키는 Railway Variables에 입력합니다.
+현재 API는 DB 없이 시작되므로 migration을 Pre-deploy에 넣을 필요가 없습니다.
+
+FO·BO Variables의 `API_PROXY_TARGET`은 `https://<API 공개 도메인>`으로 지정하고 재배포합니다.
+API 경로 `/api/v1`은 붙이지 않습니다. 브라우저 요청은 FO·BO의 `/api` 프록시를 통해 전달됩니다.
+
+배포 로그에 아래처럼 `0.0.0.0`과 지정 포트가 나와야 합니다.
+
+```text
+LawCheck API: http://0.0.0.0:4000/api/v1/health (prototype)
+```
+
+`https://<API 공개 도메인>/api/v1/health`가 200이면 API 연결이 정상입니다.
+루트 `/`는 제공하지 않으므로 404가 정상입니다. health는 DB·OpenAI 연결까지 확인하지 않습니다.
+502가 계속되면 Deployment의 설정 출처에서 새 `railway.json` 적용 여부, 위 시작 로그,
+도메인의 Target port를 확인합니다. `127.0.0.1` 로그가 나오면 여전히 로컬 진입 파일로 실행 중입니다.
+
+현재 세션은 서버 메모리에 저장되므로 단일 인스턴스로 사용합니다. 재배포하면 세션 횟수는 초기화됩니다.
+개발용 3회 제한 해제는 그대로 유지하며, 오픈 시 `QUESTION_LIMIT_ENABLED=true`로 바꿀 수 있습니다.
+
+공식 참고: [Railway 502 해결](https://docs.railway.com/networking/troubleshooting/application-failed-to-respond),
+[서비스별 설정 파일 지정](https://docs.railway.com/config-as-code).
 
 Watch Paths는 앱 외에도 `/packages/contracts/**`, `/package.json`, `/package-lock.json`,
 `/tsconfig.base.json` 변경을 포함하면 공통 의존성 변경 시에도 재배포할 수 있습니다.
