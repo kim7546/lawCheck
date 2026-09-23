@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import {
-  Scale,
   LayoutDashboard,
   Users,
   CalendarDays,
@@ -52,16 +51,14 @@ function App() {
     <div className="office-shell">
       <aside>
         <div className="office-logo">
-          <Scale size={24} />
-          <b>
-            lawCheck<span> OFFICE</span>
-          </b>
+          <img src="/brand/logo.png" alt="aiqaver.com" />
         </div>
-        <p className="office-label">사무실 관리 시스템</p>
+        <p className="office-label">AI QAVER · OFFICE</p>
         <nav>
           {sections.map(({ name, icon: Icon }, index) => (
             <button
               key={name}
+              aria-current={active === index ? 'page' : undefined}
               className={active === index ? 'active' : ''}
               onClick={() => setActive(index)}
             >
@@ -70,7 +67,15 @@ function App() {
             </button>
           ))}
         </nav>
-        <a className="fo-link" href="http://localhost:5173" target="_blank" rel="noreferrer">
+        <a
+          className="fo-link"
+          href={
+            import.meta.env.VITE_FO_URL ||
+            (import.meta.env.DEV ? 'http://localhost:5173' : 'https://aiqaver.com')
+          }
+          target="_blank"
+          rel="noreferrer"
+        >
           FO 첫 화면 보기
           <ArrowUpRight size={16} />
         </a>

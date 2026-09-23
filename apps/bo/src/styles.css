@@ -1,7 +1,9 @@
+@import '../../../packages/brand/tokens.css';
+
 :root {
-  font-family: system-ui, 'Malgun Gothic', sans-serif;
-  color: #293f35;
-  background: #f8faf6;
+  font-family: var(--brand-font);
+  color: var(--brand-navy);
+  background: var(--brand-gray);
   font-synthesis: none;
 }
 * {
@@ -23,8 +25,8 @@ button {
 }
 aside {
   width: 238px;
-  background: #183e33;
-  color: #eaf0e3;
+  background: var(--brand-navy);
+  color: var(--brand-soft);
   padding: 32px 22px;
   display: flex;
   flex-direction: column;
@@ -39,12 +41,12 @@ aside {
 .office-logo span {
   font-size: 8px;
   letter-spacing: 1px;
-  color: #a3bb8c;
+  color: var(--brand-charcoal);
   margin-left: 5px;
 }
 .office-label {
   font-size: 11px;
-  color: #8ca793;
+  color: var(--brand-charcoal);
   margin: 17px 0 42px;
 }
 nav {
@@ -59,15 +61,15 @@ nav button {
   padding: 13px;
   border: 0;
   background: none;
-  color: #a9bfb0;
+  color: var(--brand-border);
   text-align: left;
   border-radius: 7px;
   font-size: 12px;
 }
 nav button.active,
 nav button:hover {
-  background: #2a4f3f;
-  color: #eef4e8;
+  background: var(--brand-navy);
+  color: var(--brand-gray);
 }
 .fo-link {
   margin-top: auto;
@@ -76,7 +78,7 @@ nav button:hover {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #acc4a6;
+  color: var(--brand-border);
 }
 main {
   flex: 1;
@@ -84,16 +86,16 @@ main {
 }
 header {
   height: 77px;
-  border-bottom: 1px solid #e2e8dc;
+  border-bottom: 1px solid var(--brand-soft);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 38px;
   font-size: 10px;
-  color: #7c8973;
+  color: var(--brand-charcoal);
 }
 .preview {
-  background: #e9efdf;
+  background: var(--brand-soft);
   border-radius: 4px;
   padding: 6px 10px;
   font-size: 10px;
@@ -106,7 +108,7 @@ main > section {
 .eyebrow {
   font-size: 9px;
   letter-spacing: 2px;
-  color: #839a6c;
+  color: var(--brand-charcoal);
 }
 h1 {
   font-size: 30px;
@@ -115,11 +117,11 @@ h1 {
 }
 main > section > p {
   font-size: 13px;
-  color: #819174;
+  color: var(--brand-charcoal);
 }
 .setup-notice {
-  background: #eef3e5;
-  border: 1px solid #dce6cd;
+  background: var(--brand-gray);
+  border: 1px solid var(--brand-border);
   padding: 20px;
   border-radius: 9px;
   display: flex;
@@ -127,7 +129,7 @@ main > section > p {
   margin-top: 28px;
 }
 .setup-notice > svg {
-  color: #738b58;
+  color: var(--brand-charcoal);
 }
 .setup-notice strong {
   font-size: 12px;
@@ -135,7 +137,7 @@ main > section > p {
 .setup-notice p {
   font-size: 11px;
   line-height: 1.8;
-  color: #849572;
+  color: var(--brand-charcoal);
   margin-bottom: 0;
 }
 .stats {
@@ -146,7 +148,7 @@ main > section > p {
 }
 .stats article {
   background: white;
-  border: 1px solid #e2e8db;
+  border: 1px solid var(--brand-soft);
   border-radius: 8px;
   padding: 21px;
   display: flex;
@@ -155,46 +157,134 @@ main > section > p {
 }
 .stats span {
   font-size: 11px;
-  color: #7c8b70;
+  color: var(--brand-charcoal);
 }
 .stats strong {
   font-size: 27px;
 }
 .stats small {
   font-size: 9px;
-  color: #a0aa96;
+  color: var(--brand-charcoal);
 }
 .empty-state {
-  border: 1px dashed #ccd9bf;
+  border: 1px dashed var(--brand-border);
   border-radius: 10px;
   text-align: center;
   padding: 65px 20px;
   margin-top: 26px;
-  background: #fbfcf8;
-  color: #829c6c;
+  background: var(--brand-white);
+  color: var(--brand-charcoal);
 }
 .empty-state h2 {
   font-size: 17px;
-  color: #4a6340;
+  color: var(--brand-navy);
   font-weight: 500;
 }
 .empty-state p {
   font-size: 12px;
   line-height: 2;
-  color: #8c9a80;
+  color: var(--brand-charcoal);
 }
 .empty-state > span {
   display: inline-block;
   margin-top: 12px;
   font-size: 10px;
   border-radius: 4px;
-  background: #edf2e5;
+  background: var(--brand-gray);
   padding: 7px 12px;
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 3px solid #9cb57b;
+  outline: 3px solid var(--brand-charcoal);
   outline-offset: 3px;
+}
+/* The office uses the same CI tokens with a navy navigation surface. */
+aside {
+  width: 252px;
+  background: var(--brand-navy);
+  color: white;
+}
+.office-logo {
+  background: white;
+  max-width: 208px;
+  border-radius: 12px;
+  padding: 8px;
+}
+.office-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.office-label,
+.fo-link {
+  color: var(--brand-sky);
+}
+nav button {
+  color: var(--brand-border);
+  border-radius: 10px;
+  min-height: 46px;
+  font-size: 13px;
+}
+nav button.active,
+nav button:hover {
+  background: var(--brand-blue);
+  color: white;
+}
+header {
+  background: white;
+  font-size: 12px;
+}
+.preview {
+  background: var(--brand-soft);
+  color: var(--brand-blue);
+}
+.eyebrow {
+  color: var(--brand-blue);
+}
+h1 {
+  font-weight: 800;
+}
+.setup-notice {
+  background: var(--brand-soft);
+  border-radius: 14px;
+}
+.setup-notice > svg {
+  color: var(--brand-blue);
+}
+.setup-notice strong,
+.stats span {
+  font-size: 14px;
+}
+.setup-notice p,
+.stats small,
+.empty-state p {
+  font-size: 12px;
+}
+.stats article {
+  border-radius: 16px;
+  border-top: 3px solid var(--brand-blue);
+  padding: 24px;
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--brand-navy) 3%, transparent);
+}
+.stats strong {
+  font-size: 34px;
+}
+.empty-state {
+  border-style: solid;
+  border-radius: 18px;
+  background: white;
+  padding: 72px 24px;
+}
+.empty-state > svg {
+  color: var(--brand-blue);
+}
+.empty-state h2 {
+  color: var(--brand-navy);
+  font-weight: 700;
+}
+button:focus-visible,
+a:focus-visible {
+  outline-color: var(--brand-sky);
 }
 @media (max-width: 850px) {
   aside {

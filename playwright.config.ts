@@ -10,13 +10,17 @@ export default defineConfig({
       name: 'desktop',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'msedge',
+        channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge',
         viewport: { width: 1440, height: 1000 },
       },
     },
     {
       name: 'mobile',
-      use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium', channel: 'msedge' },
+      use: {
+        ...devices['iPhone 13'],
+        defaultBrowserType: 'chromium',
+        channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge',
+      },
     },
   ],
   webServer: {

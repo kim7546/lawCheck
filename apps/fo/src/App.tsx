@@ -62,13 +62,7 @@ type InfoPanel = 'guide' | 'privacy' | 'notice' | null;
 function Brand({ small = false }: { small?: boolean }) {
   return (
     <span className={`brand ${small ? 'brand-small' : ''}`}>
-      <span className="brand-mark">
-        <Scale size={small ? 17 : 22} strokeWidth={1.6} />
-      </span>
-      <span>
-        law<span className="brand-light">Check</span>
-        <span className="brand-dot">.</span>
-      </span>
+      <img className="brand-logo" src="/brand/logo.png" alt="aiqaver.com" />
     </span>
   );
 }
@@ -293,7 +287,7 @@ export default function App() {
         />
       )}
       <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
-        <a href="/" className="brand-link" aria-label="lawCheck 홈">
+        <a href="/" className="brand-link" aria-label="aiqaver.com 홈">
           <Brand />
         </a>
         <p className="sidebar-tagline">법률 고민의 첫 번째 대화</p>
@@ -369,7 +363,7 @@ export default function App() {
             이용 방법 알아보기
             <ArrowUp size={15} className="diagonal-arrow" />
           </button>
-          <div className="sidebar-copyright">© 2026 lawCheck</div>
+          <div className="sidebar-copyright">© 2026 aiqaver.com</div>
         </div>
       </aside>
 
@@ -383,7 +377,7 @@ export default function App() {
             >
               <Menu size={21} />
             </button>
-            <span className="workspace-title">법률 AI 어시스턴트</span>
+            <span className="workspace-title">aiqaver.com</span>
             <span className="beta-tag">PREVIEW</span>
           </div>
           <button className="office-chip" onClick={() => setInfo('guide')}>
@@ -400,12 +394,12 @@ export default function App() {
             <>
               <section className="hero">
                 <span className="eyebrow">
-                  <span /> A LITTLE CLARITY, A BETTER NEXT STEP
+                  <span /> AI · QUESTION · ANSWER · VERIFY
                 </span>
                 <h1>
                   복잡한 법률 고민,
                   <br />
-                  <span>차근차근 풀어보세요.</span>
+                  <span>질문에서 답을 찾으세요.</span>
                 </h1>
                 <p>
                   어디서부터 시작해야 할지 막막할 때,
@@ -428,24 +422,6 @@ export default function App() {
                     <Check size={14} />
                     원하는 답변만 검증
                   </span>
-                </div>
-              </section>
-              <section className="question-section" aria-labelledby="question-heading">
-                <div className="section-heading">
-                  <h2 id="question-heading">어떤 고민이 있으신가요?</h2>
-                  <span>가까운 주제를 골라 시작해 보세요</span>
-                </div>
-                <div className="topic-grid">
-                  {topics.map(({ name, icon: Icon, prompt, description }) => (
-                    <button className="topic-card" key={name} onClick={() => choosePrompt(prompt)}>
-                      <span className="topic-icon">
-                        <Icon size={21} strokeWidth={1.5} />
-                      </span>
-                      <strong>{name}</strong>
-                      <p>{description}</p>
-                      <ArrowUp size={15} className="topic-arrow" />
-                    </button>
-                  ))}
                 </div>
               </section>
             </>
@@ -472,7 +448,7 @@ export default function App() {
                     </span>
                     <div className="assistant-body">
                       <div className="assistant-name">
-                        lawCheck <span>{turn.status === 'error' ? '연결 안내' : 'AI 답변'}</span>
+                        aiqaver.com <span>{turn.status === 'error' ? '연결 안내' : 'AI 답변'}</span>
                       </div>
                       <p
                         className={turn.status === 'pending' ? 'typing-bubble' : undefined}
@@ -574,6 +550,27 @@ export default function App() {
           </section>
 
           {!turns.length && (
+            <section className="question-section" aria-labelledby="question-heading">
+              <div className="section-heading">
+                <h2 id="question-heading">어떤 고민이 있으신가요?</h2>
+                <span>가까운 주제를 골라 시작해 보세요</span>
+              </div>
+              <div className="topic-grid">
+                {topics.map(({ name, icon: Icon, prompt, description }) => (
+                  <button className="topic-card" key={name} onClick={() => choosePrompt(prompt)}>
+                    <span className="topic-icon">
+                      <Icon size={21} strokeWidth={1.5} />
+                    </span>
+                    <strong>{name}</strong>
+                    <p>{description}</p>
+                    <ArrowUp size={15} className="topic-arrow" />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {!turns.length && (
             <section className="verification-promo">
               <div className="promo-illustration">
                 <div className="illustration-back" />
@@ -640,7 +637,7 @@ export default function App() {
               ? '변호사 검증, 이렇게 진행돼요'
               : info === 'privacy'
                 ? '개인정보 안내'
-                : 'lawCheck 체험 안내'
+                : 'aiqaver.com 체험 안내'
           }
           onClose={() => setInfo(null)}
         >
@@ -694,7 +691,7 @@ export default function App() {
           ) : (
             <div className="info-prose">
               <p>
-                lawCheck의 첫 화면과 질문·검증 요청 흐름을 확인할 수 있는 개발용 미리보기입니다.
+                aiqaver.com의 첫 화면과 질문·검증 요청 흐름을 확인할 수 있는 개발용 미리보기입니다.
               </p>
               <p>
                 답변은 GPT API로 생성됩니다. DB 대화 저장, 변호사 배정, 이메일 발송은 아직 연결되지
