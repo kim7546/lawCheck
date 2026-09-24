@@ -11,6 +11,15 @@ try {
     .map((entry) => entry.name)
     .sort();
   for (const [index, directory] of directories.entries()) {
+    if (directory === '202609240002_individual_reviews') {
+      await db.exec(`
+        INSERT INTO reviewer_accounts(id,email,name,password_hash) VALUES
+          ('00000000-0000-4000-8000-000000000001','migration@example.com','Legacy reviewer','test');
+        INSERT INTO review_board_posts(id,session_id,answer_message_id,question,ai_answer,requester_email,status,reviewer_id,reply,completed_at) VALUES
+          ('00000000-0000-4000-8000-000000000002',gen_random_uuid(),gen_random_uuid(),'Q','AI','q@example.com','COMPLETED','00000000-0000-4000-8000-000000000001','Existing reply',now()),
+          ('00000000-0000-4000-8000-000000000003',gen_random_uuid(),gen_random_uuid(),'Q2','AI2','q@example.com','REVIEWING','00000000-0000-4000-8000-000000000001',NULL,NULL);
+      `);
+    }
     await db.exec(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
     if (index === 0) {
       await db.exec(`INSERT INTO law_offices (id,code,name,is_active,updated_at)
@@ -25,11 +34,24 @@ try {
   const tables = await db.query(
     "SELECT count(*)::int AS count FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'",
   );
-  assert.equal(tables.rows[0].count, 16);
+  assert.equal(tables.rows[0].count, 24);
+  assert.deepEqual(
+    (await db.query('SELECT status, reply FROM review_contributions ORDER BY post_id')).rows,
+    [
+      { status: 'COMPLETED', reply: 'Existing reply' },
+      { status: 'REVIEWING', reply: null },
+    ],
+  );
+  assert.equal(
+    (await db.query('SELECT count(*)::int AS count FROM review_choices')).rows[0].count,
+    0,
+  );
   await db.exec(
     await readFile(new URL('../apps/api/prisma/tests/integrity.sql', import.meta.url), 'utf8'),
   );
-  console.log('Database integrity tests passed (isolated PostgreSQL/PGlite, 16 tables).');
+  console.log(
+    'Database integrity and legacy review migration tests passed (isolated PostgreSQL/PGlite, 24 tables).',
+  );
 } finally {
   await db.close();
 }

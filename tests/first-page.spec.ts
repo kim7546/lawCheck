@@ -42,14 +42,17 @@ test('keyboard submission preserves composition and scrolls to the newest questi
       return !!q && !!composer && q.y >= 0 && q.y + q.height <= composer.y;
     })
     .toBe(true);
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page
+    .locator('.chat-scroll')
+    .evaluate((element) => element.scrollTo({ top: 0, behavior: 'instant' }));
   finish();
   await expect(newest.locator('.assistant-body > p')).toHaveText(answer);
   await expect(question).toBeInViewport({ ratio: 1 });
   await expect
     .poll(async () => {
       const box = await newest.boundingBox();
-      return box ? Math.abs(box.y - 25) : Infinity;
+      const scroll = await page.locator('.chat-scroll').boundingBox();
+      return box && scroll ? Math.abs(box.y - scroll.y - 25) : Infinity;
     })
     .toBeLessThan(5);
   await expect(input).toHaveValue('');
@@ -165,6 +168,20 @@ test('failed answer restores question for retry and does not consume quota', asy
 });
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/chat/history', (route) =>
+    route.fulfill({ json: { success: true, data: { messages: [] } } }),
+  );
+  await page.route('**/api/v1/chat/conversations', (route) =>
+    route.fulfill({ json: { success: true, data: [] } }),
+  );
+  await page.route('**/api/v1/reviews', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        data: route.request().method() === 'GET' ? [] : { id: 'review-1', status: 'REQUESTED' },
+      },
+    }),
+  );
   await page.route('**/api/v1/config', (route) =>
     route.fulfill({
       json: {
@@ -209,14 +226,13 @@ test('first page, sample question, selected-question review, and reset', async (
       exact: true,
     }),
   ).toBeVisible();
-  await dialog.getByLabel('답변받을 이메일').fill('demo@example.com');
+  await dialog.getByLabel('연락 이메일').fill('demo@example.com');
   await dialog.getByRole('checkbox').check();
-  await dialog.getByRole('button', { name: '검증 요청 체험하기' }).click();
-  await expect(dialog.getByRole('heading', { name: /검증 요청 흐름을/ })).toBeVisible();
-  await expect(dialog.getByText(/실제 접수나 이메일 발송은 하지 않았어요/)).toBeVisible();
+  await dialog.getByRole('button', { name: '검증 요청하기' }).click();
+  await expect(dialog.getByRole('heading', { name: /검증 요청이/ })).toBeVisible();
+  await expect(dialog.getByText(/왼쪽 대화 이력에 빨간 숫자/)).toBeVisible();
   await dialog.getByRole('button', { name: '대화로 돌아가기' }).click();
   await page.getByRole('button', { name: '새로운 질문 시작하기' }).click();
-  await page.getByRole('button', { name: '새 대화 시작', exact: true }).click();
   await expect(page.getByRole('heading', { name: /법률이 궁금할 때/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -267,7 +283,6 @@ test('three questions exhaust the session; only legal answers offer verification
   await expect(page.getByRole('button', { name: '질문 보내기' })).toBeDisabled();
   expect(calls).toBe(3);
   await page.getByRole('button', { name: '새로운 질문 시작하기' }).click();
-  await page.getByRole('button', { name: '새 대화 시작', exact: true }).click();
   await expect(page.locator('.remaining b')).toHaveText('3');
   await expect(page.getByRole('textbox', { name: '질문' })).toBeEnabled();
 });

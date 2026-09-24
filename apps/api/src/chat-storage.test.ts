@@ -122,6 +122,259 @@ test(
         .expect(503);
       assert.equal(unsaved.body.error.code, 'DATABASE_UNAVAILABLE');
       assert.equal(await db.chatMessage.count({ where: { content: 'answer:reject-save' } }), 0);
+
+      // Exercise the initial BO release against the same isolated PostgreSQL database.
+      const reviewApp = createApp(
+        'Test',
+        async () => ({ answer: '검증할 AI 답변', isLegalQuestion: true }),
+        { storage, db },
+      );
+      const requester = request.agent(reviewApp);
+      const reviewer = request.agent(reviewApp);
+      const otherReviewer = request.agent(reviewApp);
+      await request(reviewApp).get('/api/v1/bo/reviews').expect(401);
+      await reviewer
+        .post('/api/v1/bo/signup')
+        .send({ email: 'review@example.com', password: 'short', name: '답변자' })
+        .expect(400);
+      const signup = await reviewer
+        .post('/api/v1/bo/signup')
+        .send({ email: 'Review@example.com', password: 'test-password-123', name: '답변자' })
+        .expect(201);
+      assert.equal(signup.body.data.email, 'review@example.com');
+      assert.equal(signup.body.data.passwordHash, undefined);
+      assert.ok(
+        (await db.reviewerAccount.findUniqueOrThrow({ where: { id: signup.body.data.id } }))
+          .passwordHash !== 'test-password-123',
+      );
+      await request(reviewApp)
+        .post('/api/v1/bo/signup')
+        .send({ email: 'review@example.com', password: 'test-password-123', name: '중복' })
+        .expect(409);
+      await reviewer.get('/api/v1/bo/me').expect(200);
+      await reviewer.post('/api/v1/bo/logout').expect(200);
+      await reviewer.get('/api/v1/bo/me').expect(401);
+      await reviewer
+        .post('/api/v1/bo/login')
+        .send({ email: 'review@example.com', password: 'wrong-password' })
+        .expect(401);
+      await reviewer
+        .post('/api/v1/bo/login')
+        .send({ email: 'review@example.com', password: 'test-password-123' })
+        .expect(200);
+      await otherReviewer
+        .post('/api/v1/bo/signup')
+        .send({ email: 'other@example.com', password: 'test-password-456', name: '다른 답변자' })
+        .expect(201);
+      const chat = await requester
+        .post('/api/v1/chat')
+        .send({ question: '검증을 요청할 질문' })
+        .expect(200);
+      const payload = {
+        answerMessageId: chat.body.data.answerMessageId,
+        email: 'requester@example.com',
+        consent: true,
+      };
+      await request(reviewApp).post('/api/v1/reviews').send(payload).expect(404);
+      await requester
+        .post('/api/v1/reviews')
+        .send({ ...payload, consent: false })
+        .expect(400);
+      const submitted = await requester.post('/api/v1/reviews').send(payload).expect(201);
+      const postId = submitted.body.data.id;
+      assert.equal(
+        (await requester.post('/api/v1/reviews').send(payload).expect(201)).body.data.id,
+        postId,
+      );
+      const listing = await reviewer.get('/api/v1/bo/reviews').expect(200);
+      assert.equal(listing.body.data.total, 1);
+      const detail = await reviewer.get(`/api/v1/bo/reviews/${postId}`).expect(200);
+      assert.equal(detail.body.data.question, '검증을 요청할 질문');
+      assert.equal(detail.body.data.aiAnswer, '검증할 AI 답변');
+      assert.equal(detail.body.data.requesterEmail, undefined);
+      await reviewer
+        .post(`/api/v1/bo/reviews/${postId}/complete`)
+        .send({ reply: '검증 전 완료 불가' })
+        .expect(409);
+      await reviewer
+        .post(`/api/v1/bo/reviews/${postId}/claim`)
+        .set('Sec-Fetch-Site', 'cross-site')
+        .expect(403);
+      const claims = await Promise.all([
+        reviewer.post(`/api/v1/bo/reviews/${postId}/claim`),
+        reviewer.post(`/api/v1/bo/reviews/${postId}/claim`),
+      ]);
+      assert.deepEqual(claims.map((r) => r.status).sort(), [200, 409]);
+      await otherReviewer
+        .post(`/api/v1/bo/reviews/${postId}/complete`)
+        .send({ reply: '검증 시작 전' })
+        .expect(409);
+      await reviewer.post(`/api/v1/bo/reviews/${postId}/complete`).send({ reply: ' ' }).expect(400);
+      const completed = await Promise.all([
+        reviewer.post(`/api/v1/bo/reviews/${postId}/complete`).send({ reply: 'A의 검증 답변' }),
+        reviewer.post(`/api/v1/bo/reviews/${postId}/complete`).send({ reply: 'A의 검증 답변' }),
+      ]);
+      assert.deepEqual(completed.map((r) => r.status).sort(), [200, 409]);
+      await reviewer
+        .post(`/api/v1/bo/reviews/${postId}/complete`)
+        .send({ reply: '재전송' })
+        .expect(409);
+      await reviewer.post(`/api/v1/bo/reviews/${postId}/claim`).expect(409);
+      // B sees exactly the same detail and list as before A participated.
+      const otherDetail = await otherReviewer.get(`/api/v1/bo/reviews/${postId}`).expect(200);
+      assert.deepEqual(otherDetail.body.data, detail.body.data);
+      assert.deepEqual(
+        (await otherReviewer.get('/api/v1/bo/reviews').expect(200)).body.data,
+        listing.body.data,
+      );
+      assert.equal(
+        (await otherReviewer.get('/api/v1/bo/reviews?status=REQUESTED').expect(200)).body.data
+          .total,
+        1,
+      );
+      assert.equal(
+        (await otherReviewer.get('/api/v1/bo/reviews?status=COMPLETED').expect(200)).body.data
+          .total,
+        0,
+      );
+      assert.equal(
+        (await reviewer.get('/api/v1/bo/reviews?status=REQUESTED').expect(200)).body.data.total,
+        0,
+      );
+      await otherReviewer.post(`/api/v1/bo/reviews/${postId}/claim`).expect(200);
+      const pendingContribution = await db.reviewContribution.findFirstOrThrow({
+        where: { postId, status: 'REVIEWING' },
+      });
+      await requester
+        .post(`/api/v1/reviews/${postId}/selection`)
+        .send({ answerId: pendingContribution.id })
+        .expect(404);
+      assert.equal(
+        (await requester.get('/api/v1/reviews').expect(200)).body.data[0].answers.length,
+        1,
+      );
+      await otherReviewer
+        .post(`/api/v1/bo/reviews/${postId}/complete`)
+        .send({ reply: 'B의 검증 답변', reviewerId: signup.body.data.id })
+        .expect(200);
+      assert.equal(
+        (await reviewer.get(`/api/v1/bo/reviews/${postId}`).expect(200)).body.data.reply,
+        'A의 검증 답변',
+      );
+      assert.equal(
+        (await otherReviewer.get(`/api/v1/bo/reviews/${postId}`).expect(200)).body.data.reply,
+        'B의 검증 답변',
+      );
+      const result = await requester.get('/api/v1/reviews').expect(200);
+      assert.deepEqual(
+        result.body.data[0].answers.map((a: { reply: string }) => a.reply),
+        ['A의 검증 답변', 'B의 검증 답변'],
+      );
+      assert.equal(result.body.data[0].selectedAnswerId, null);
+      const [answerA, answerB] = result.body.data[0].answers;
+      await request(reviewApp)
+        .post(`/api/v1/reviews/${postId}/selection`)
+        .send({ answerId: answerA.id })
+        .expect(404);
+      await requester
+        .post(`/api/v1/reviews/${postId}/selection`)
+        .send({ answerId: answerA.id })
+        .expect(200);
+      assert.equal(
+        (await requester.get('/api/v1/reviews').expect(200)).body.data[0].selectedAnswerId,
+        answerA.id,
+      );
+      await requester
+        .post(`/api/v1/reviews/${postId}/selection`)
+        .send({ answerId: answerB.id })
+        .expect(200);
+      assert.equal(
+        (await requester.get('/api/v1/reviews').expect(200)).body.data[0].selectedAnswerId,
+        answerB.id,
+      );
+      assert.equal(await db.reviewChoice.count({ where: { postId } }), 1);
+      assert.equal(result.body.data[0].answers[0].unread, true);
+      await request(reviewApp)
+        .post(`/api/v1/reviews/${postId}/read`)
+        .send({ answerIds: [answerA.id] })
+        .expect(404);
+      await requester
+        .post(`/api/v1/reviews/${postId}/read`)
+        .send({ answerIds: [answerA.id] })
+        .expect(200);
+      const readResult = await requester.get('/api/v1/reviews').expect(200);
+      assert.equal(readResult.body.data[0].answers[0].unread, false);
+      assert.equal(readResult.body.data[0].answers[1].unread, true);
+      await requester
+        .post(`/api/v1/reviews/${postId}/read`)
+        .send({ answerIds: [answerA.id] })
+        .expect(200);
+      assert.equal(await db.foReviewRead.count(), 1);
+      const originalChatId = (await requester.get('/api/v1/chat/history').expect(200)).body.data
+        .sessionId;
+      const newChatId = (await requester.post('/api/v1/chat/session').expect(200)).body.data
+        .sessionId;
+      assert.notEqual(originalChatId, newChatId);
+      assert.equal(
+        (await requester.get('/api/v1/chat/history').expect(200)).body.data.messages.length,
+        0,
+      );
+      assert.equal(
+        (await requester.get('/api/v1/reviews').expect(200)).body.data[0].answers.length,
+        2,
+      );
+      const oldChats = await requester.get('/api/v1/chat/conversations').expect(200);
+      assert.equal(oldChats.body.data[0].id, originalChatId);
+      await request(reviewApp)
+        .post(`/api/v1/chat/conversations/${originalChatId}/select`)
+        .expect(404);
+      await request(reviewApp)
+        .post('/api/v1/chat')
+        .send({ question: '다른 사람의 대화', sessionId: originalChatId })
+        .expect(404);
+      await requester
+        .post('/api/v1/chat')
+        .send({ question: '새 탭에서도 이전 대화에 질문', sessionId: originalChatId })
+        .expect(200);
+      assert.equal(
+        (await requester.get('/api/v1/chat/history').expect(200)).body.data.messages.length,
+        0,
+      );
+      const reopened = await requester
+        .post(`/api/v1/chat/conversations/${originalChatId}/select`)
+        .expect(200);
+      assert.equal(reopened.body.data.messages.length, 4);
+      assert.equal(
+        (await requester.get('/api/v1/reviews').expect(200)).body.data[0].answers[0].unread,
+        false,
+      );
+      const secondChat = await requester
+        .post('/api/v1/chat')
+        .send({ question: '다른 검증 질문' })
+        .expect(200);
+      const secondPost = await requester
+        .post('/api/v1/reviews')
+        .send({ ...payload, answerMessageId: secondChat.body.data.answerMessageId })
+        .expect(201);
+      await requester
+        .post(`/api/v1/reviews/${secondPost.body.data.id}/selection`)
+        .send({ answerId: answerA.id })
+        .expect(404);
+      // Selection never exposes any new metadata to other reviewers.
+      assert.deepEqual(
+        Object.keys(
+          (await reviewer.get(`/api/v1/bo/reviews/${postId}`).expect(200)).body.data,
+        ).sort(),
+        ['id', 'question', 'aiAnswer', 'createdAt', 'status', 'reply', 'completedAt'].sort(),
+      );
+      assert.deepEqual((await request(reviewApp).get('/api/v1/reviews').expect(200)).body.data, []);
+      assert.equal(
+        (await reviewer.get('/api/v1/bo/reviews?status=COMPLETED').expect(200)).body.data.total,
+        1,
+      );
+      await reviewer.get('/api/v1/bo/reviews?page=-1').expect(400);
+      await db.reviewerLoginSession.updateMany({ data: { expiresAt: new Date(0) } });
+      await reviewer.get('/api/v1/bo/me').expect(401);
     } finally {
       await db?.$disconnect();
       await socket.stop();

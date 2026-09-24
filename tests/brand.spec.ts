@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 
 test('question-first brand layout and logo fit the viewport', async ({ page }, testInfo) => {
+  await page.route('**/api/v1/chat/history', (route) =>
+    route.fulfill({ json: { success: true, data: { messages: [] } } }),
+  );
+  await page.route('**/api/v1/chat/conversations', (route) =>
+    route.fulfill({ json: { success: true, data: [] } }),
+  );
+  await page.route('**/api/v1/reviews', (route) =>
+    route.fulfill({ json: { success: true, data: [] } }),
+  );
   await page.route('**/api/v1/config', (route) =>
     route.fulfill({
       json: {
@@ -15,8 +24,8 @@ test('question-first brand layout and logo fit the viewport', async ({ page }, t
   );
   await page.goto('/');
   await expect(page).toHaveTitle(/aiqaver.com/);
-  await expect(page.locator('aside, .sidebar, .nav-backdrop')).toHaveCount(0);
-  await expect(page.getByRole('banner').getByRole('img', { name: 'aiqaver.com' })).toBeVisible();
+  await expect(page.locator('.sidebar')).toHaveCount(1);
+  await expect(page.getByRole('banner')).toContainText('AI QAVER');
   await expect(page.getByRole('button', { name: '새로운 질문 시작하기' })).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/법률사무소|사무실/);
   await page.getByRole('button', { name: '이용 방법', exact: true }).click();
@@ -24,6 +33,9 @@ test('question-first brand layout and logo fit the viewport', async ({ page }, t
   await page.keyboard.press('Escape');
   const composer = page.getByRole('textbox', { name: '질문' });
   await expect(composer).toBeVisible();
+  const hero = await page.locator('.hero').boundingBox();
+  const inputBox = await page.locator('.composer').boundingBox();
+  expect(hero && inputBox && hero.y + hero.height <= inputBox.y).toBe(true);
   expect(await composer.evaluate((el) => el.getBoundingClientRect().top)).toBeLessThan(
     await page.locator('.topic-grid').evaluate((el) => el.getBoundingClientRect().top),
   );
@@ -39,17 +51,23 @@ test('question-first brand layout and logo fit the viewport', async ({ page }, t
   await page.screenshot({ path: testInfo.outputPath('fo.png'), fullPage: true });
 });
 
-test('office brand, navigation and cards fit the viewport', async ({ page }, testInfo) => {
+test('reviewer login replaces office management and fits the viewport', async ({
+  page,
+}, testInfo) => {
+  await page.route('**/api/v1/bo/me', (route) =>
+    route.fulfill({
+      status: 401,
+      json: { success: false, error: { message: '로그인이 필요합니다.' } },
+    }),
+  );
   await page.goto('http://127.0.0.1:5174');
-  await expect(page).toHaveTitle(/aiqaver.com Office/);
+  await expect(page).toHaveTitle(/aiqaver.com.*검증 게시판/);
   await expect(page.getByRole('img', { name: 'aiqaver.com' })).toBeVisible();
-  await expect(page.locator('.stats article')).toHaveCount(4);
+  await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
+  await expect(page.locator('body')).not.toContainText(/사무실|휴가 관리|변호사 관리/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('bo.png'), fullPage: true });
-  await page.getByRole('button', { name: '검증 요청', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '검증 요청', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '검증 요청', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await page.getByRole('button', { name: /아직 계정이 없나요/ }).click();
+  await expect(page.getByRole('heading', { name: '회원가입', exact: true })).toBeVisible();
+  await expect(page.getByLabel('이름', { exact: true })).toBeVisible();
 });

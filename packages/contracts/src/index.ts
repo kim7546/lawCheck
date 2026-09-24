@@ -12,6 +12,7 @@ export interface PublicConfig {
 }
 
 export interface ChatTurn {
+  answerMessageId?: string;
   id: string;
   question: string;
   answer: string;
@@ -31,5 +32,12 @@ export interface ChatAnswer {
 }
 
 export type ChatResponse =
-  | { success: true; data: ChatAnswer & { remainingQuestions?: number | null } }
+  | {
+      success: true;
+      data: ChatAnswer & {
+        remainingQuestions?: number | null;
+        answerMessageId?: string;
+        sessionId?: string;
+      };
+    }
   | { success: false; error: { code: string; message: string } };

@@ -17,7 +17,7 @@ export function readPort(value: string | undefined): number {
 export function startServer(config: ServerConfig) {
   const db = new PrismaClient();
   const storage = new ChatStorage(db, process.env.LAW_OFFICE_CODE ?? 'LAW001');
-  const server = createApp(process.env.LAW_OFFICE_NAME, undefined, { storage }).listen(
+  const server = createApp(process.env.LAW_OFFICE_NAME, undefined, { storage, db }).listen(
     config.port,
     config.host,
     () => {

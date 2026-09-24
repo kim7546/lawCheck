@@ -7,6 +7,106 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model ReviewerAccount {
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique @db.VarChar(254)
+  name String @db.VarChar(100)
+  passwordHash String @map("password_hash") @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  sessions ReviewerLoginSession[]
+  reviews ReviewBoardPost[]
+  contributions ReviewContribution[]
+  @@map("reviewer_accounts")
+}
+
+model ReviewerLoginSession {
+  id String @id @default(uuid()) @db.Uuid
+  accountId String @map("account_id") @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  account ReviewerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+  @@map("reviewer_login_sessions")
+}
+
+model ReviewBoardPost {
+  id String @id @default(uuid()) @db.Uuid
+  sessionId String @map("session_id") @db.Uuid
+  answerMessageId String @unique @map("answer_message_id") @db.Uuid
+  question String @db.Text
+  aiAnswer String @map("ai_answer") @db.Text
+  requesterEmail String @map("requester_email") @db.VarChar(254)
+  status String @default("REQUESTED") @db.VarChar(20)
+  reviewerId String? @map("reviewer_id") @db.Uuid
+  reply String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
+  reviewer ReviewerAccount? @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  contributions ReviewContribution[]
+  choice ReviewChoice?
+  @@index([status, createdAt])
+  @@index([sessionId])
+  @@map("review_board_posts")
+}
+
+model ReviewContribution {
+  id String @id @default(uuid()) @db.Uuid
+  postId String @map("post_id") @db.Uuid
+  reviewerId String @map("reviewer_id") @db.Uuid
+  status String @default("REVIEWING") @db.VarChar(20)
+  reply String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
+  post ReviewBoardPost @relation(fields: [postId], references: [id], onDelete: Restrict)
+  reviewer ReviewerAccount @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  choices ReviewChoice[]
+  reads FoReviewRead[]
+  @@unique([postId, reviewerId])
+  @@unique([postId, id])
+  @@index([reviewerId, status])
+  @@map("review_contributions")
+}
+
+model ReviewChoice {
+  postId String @id @map("post_id") @db.Uuid
+  contributionId String @map("contribution_id") @db.Uuid
+  selectedAt DateTime @default(now()) @map("selected_at") @db.Timestamptz(3)
+  post ReviewBoardPost @relation(fields: [postId], references: [id], onDelete: Restrict)
+  contribution ReviewContribution @relation(fields: [postId, contributionId], references: [postId, id], onDelete: Restrict, onUpdate: NoAction)
+  @@map("review_choices")
+}
+
+model FoBrowser {
+  id String @id @default(uuid()) @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  activeSessionId String? @map("active_session_id") @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  conversations FoConversation[]
+  reads FoReviewRead[]
+  @@map("fo_browsers")
+}
+
+model FoConversation {
+  id String @id @default(uuid()) @db.Uuid
+  browserId String @map("browser_id") @db.Uuid
+  sessionId String @unique @map("session_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  browser FoBrowser @relation(fields: [browserId], references: [id], onDelete: Cascade)
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  @@index([browserId, createdAt])
+  @@map("fo_conversations")
+}
+
+model FoReviewRead {
+  browserId String @map("browser_id") @db.Uuid
+  contributionId String @map("contribution_id") @db.Uuid
+  readAt DateTime @default(now()) @map("read_at") @db.Timestamptz(3)
+  browser FoBrowser @relation(fields: [browserId], references: [id], onDelete: Cascade)
+  contribution ReviewContribution @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+  @@id([browserId, contributionId])
+  @@map("fo_review_reads")
+}
+
 model LawOffice {
   id           String       @id @default(uuid()) @db.Uuid
   code         String       @unique @db.VarChar(50)
@@ -223,6 +323,7 @@ model LawyerLeave {
 }
 
 model ChatSession {
+  foConversation FoConversation?
   id                   String                @id @default(uuid()) @db.Uuid
   lawOfficeId          String                @map("law_office_id") @db.Uuid
   sessionTokenHash     String                @unique @map("session_token_hash") @db.VarChar(64)

@@ -5,6 +5,8 @@ import type { ChatStorage } from './chat-storage.js';
 import type { ChatRequest, HealthResponse, PublicConfig } from '@lawcheck/contracts';
 import { ChatError, createAnswerGenerator } from './chat.js';
 import { createSessionStore, MAX_QUESTIONS } from './session.js';
+import type { PrismaClient } from '@prisma/client';
+import { reviewBoardRouter } from './review-board.js';
 
 export function createApp(
   officeName = '법률사무소 IBS',
@@ -15,7 +17,8 @@ export function createApp(
   {
     questionLimitEnabled = process.env.QUESTION_LIMIT_ENABLED === 'true',
     storage,
-  }: { questionLimitEnabled?: boolean; storage?: ChatStorage } = {},
+    db,
+  }: { questionLimitEnabled?: boolean; storage?: ChatStorage; db?: PrismaClient } = {},
 ) {
   const app = express();
   const getSession = createSessionStore();
@@ -44,8 +47,11 @@ export function createApp(
     res.json({ success: true, data });
   });
   app.post('/api/v1/chat/session', async (req, res) => {
-    if (storage) await storage.session(req, res, questionLimitEnabled, true);
-    else getSession(req, res, true);
+    if (storage) {
+      const session = await storage.session(req, res, questionLimitEnabled, true);
+      res.json({ success: true, data: { sessionId: session.id } });
+      return;
+    } else getSession(req, res, true);
     res.json({ success: true });
   });
   app.get('/api/v1/chat/history', async (req, res) => {
@@ -57,7 +63,35 @@ export function createApp(
     const session = await storage.session(req, res, questionLimitEnabled);
     res.json({
       success: true,
-      data: { sessionId: session.id, messages: await storage.history(session.id) },
+      data: {
+        sessionId: session.id,
+        remainingQuestions: questionLimitEnabled
+          ? Math.max(0, MAX_QUESTIONS - session.questionCount)
+          : null,
+        messages: await storage.history(session.id),
+      },
+    });
+  });
+  app.get('/api/v1/chat/conversations', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, data: storage ? await storage.browserHistory.list(req, res) : [] });
+  });
+  app.post('/api/v1/chat/conversations/:id/select', async (req, res) => {
+    if (!storage)
+      throw new ChatError(503, 'HISTORY_UNAVAILABLE', '대화 저장소를 사용할 수 없습니다.');
+    if (req.headers['sec-fetch-site'] === 'cross-site')
+      throw new ChatError(403, 'FORBIDDEN', '다른 사이트에서 요청할 수 없습니다.');
+    await storage.browserHistory.select(req, res, String(req.params.id));
+    const session = await storage.session(req, res, questionLimitEnabled);
+    res.json({
+      success: true,
+      data: {
+        sessionId: session.id,
+        remainingQuestions: questionLimitEnabled
+          ? Math.max(0, MAX_QUESTIONS - session.questionCount)
+          : null,
+        messages: await storage.history(session.id),
+      },
     });
   });
   app.post('/api/v1/chat', async (req, res) => {
@@ -88,7 +122,10 @@ export function createApp(
       return;
     }
     if (storage) {
-      const session = await storage.session(req, res, questionLimitEnabled);
+      const session =
+        req.body?.sessionId !== undefined
+          ? await storage.browserHistory.ownedSession(req, res, String(req.body.sessionId))
+          : await storage.session(req, res, questionLimitEnabled);
       const pending = await storage.begin(session.id, question.trim(), questionLimitEnabled);
       let answer;
       try {
@@ -99,11 +136,13 @@ export function createApp(
           ? error
           : new ChatError(502, 'AI_UNAVAILABLE', 'AI 답변을 받지 못했어요. 다시 시도해 주세요.');
       }
-      await storage.complete(session.id, pending.message.id, answer);
+      const answerMessageId = await storage.complete(session.id, pending.message.id, answer);
       res.json({
         success: true,
         data: {
           ...answer,
+          answerMessageId,
+          sessionId: session.id,
           remainingQuestions: questionLimitEnabled ? Math.max(0, 3 - pending.used) : null,
         },
       });
@@ -159,7 +198,7 @@ export function createApp(
       session.pending = false;
     }
   });
-  // Verification submission is still a UI-only prototype.
+  if (db && storage) app.use('/api/v1', reviewBoardRouter(db, storage));
   app.use((_req, res) => {
     res.status(404).json({
       success: false,
