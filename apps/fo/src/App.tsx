@@ -15,7 +15,6 @@ import {
   MessageCircle,
   Plus,
   ShieldCheck,
-  Sparkles,
   X,
 } from 'lucide-react';
 import type { ChatResponse, ChatTurn, PublicConfig } from '@lawcheck/contracts';
@@ -353,7 +352,7 @@ export default function App() {
                   <div className="user-message">{turn.question}</div>
                   <div className="assistant-message">
                     <span className="assistant-avatar">
-                      <Sparkles size={20} />
+                      <img src="/brand/symbol.png" alt="AI QAVER" width={34} height={34} />
                     </span>
                     <div className="assistant-body">
                       <div className="assistant-name">
@@ -430,10 +429,8 @@ export default function App() {
               />
               <div className="composer-toolbar">
                 <span className="composer-mode">
-                  <Sparkles size={15} />
-                  AI 어시스턴트
-                  <span className="mode-divider" />
-                  질문하고 알아보세요
+                  <img src="/brand/openai.svg" alt="ChatGPT" width={18} height={18} />
+                  gpt-6-sol
                 </span>
                 <div className="composer-actions">
                   {config.questionLimitEnabled && (
