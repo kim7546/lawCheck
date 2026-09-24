@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 // Deployment settings use runtime variables, independently of the local dev config.
 const apiTarget = process.env.API_PROXY_TARGET?.trim();
 const allowedHosts = [
+  'office.aiqaver.com',
+  'lawcheckbo-production.up.railway.app',
   process.env.RAILWAY_PUBLIC_DOMAIN ?? '',
   ...(process.env.PREVIEW_ALLOWED_HOSTS ?? '').split(','),
 ]

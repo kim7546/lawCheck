@@ -12,6 +12,7 @@ FO와 BO는 개발용 `vite.config.ts`와 배포 확인용 `vite.preview.config.
 
 배포 설정은 실행 프로세스의 환경변수를 읽습니다. 루트의 개발용 `.env`는 읽지 않습니다.
 기존 FO 도메인 `lawcheckfo-production.up.railway.app`도 명시적으로 허용합니다.
+BO는 `office.aiqaver.com`과 `lawcheckbo-production.up.railway.app`을 기본으로 허용합니다.
 
 ## FO 서비스
 
