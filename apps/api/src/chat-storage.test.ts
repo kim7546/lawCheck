@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { readFile, readdir } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
@@ -54,7 +54,12 @@ test(
       );
       const client = request.agent(app);
       const config = await client.get('/api/v1/config').expect(200);
-      const cookie = config.headers['set-cookie'][0].split(';')[0];
+      const setCookie = config.headers['set-cookie'];
+      assert.ok(Array.isArray(setCookie), 'config must return session cookies');
+      const sessionCookie = setCookie[0];
+      assert.ok(sessionCookie, 'config must return a session cookie');
+      const cookie = sessionCookie.split(';')[0];
+      assert.ok(cookie, 'session cookie must contain a name and value');
       await client.post('/api/v1/chat').send({ question: 'first' }).expect(200);
       await client
         .post('/api/v1/chat')
@@ -62,11 +67,13 @@ test(
         .expect(200);
       const messages = await db.chatMessage.findMany({ orderBy: { sequenceNo: 'asc' } });
       assert.equal(messages.length, 4);
-      assert.equal(messages[1].parentMessageId, messages[0].id);
-      assert.equal(messages[3].messageType, 'NON_LEGAL_NOTICE');
+      const [firstQuestion, firstAnswer, secondQuestion, secondAnswer] = messages;
+      assert.ok(firstQuestion && firstAnswer && secondQuestion && secondAnswer);
+      assert.equal(firstAnswer.parentMessageId, firstQuestion.id);
+      assert.equal(secondAnswer.messageType, 'NON_LEGAL_NOTICE');
       assert.equal(new Set(messages.map((m) => m.sessionId)).size, 1);
       const session = await db.chatSession.findUniqueOrThrow({
-        where: { id: messages[0].sessionId },
+        where: { id: firstQuestion.sessionId },
       });
       assert.equal(session.maxQuestionCount, null);
       assert.notEqual(session.sessionTokenHash, cookie.split('=')[1]);
