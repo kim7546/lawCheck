@@ -15,7 +15,7 @@ test('keyboard submission preserves composition and scrolls to the newest questi
     await route.fulfill({ json: { success: true, data: { answer, isLegalQuestion: true } } });
   });
   await page.goto('/');
-  const input = page.getByRole('textbox', { name: '법률 질문' });
+  const input = page.getByRole('textbox', { name: '질문' });
   await input.fill('첫 줄');
   await input.press('Shift+Enter');
   await expect(input).toHaveValue('첫 줄\n');
@@ -88,13 +88,13 @@ test('disabled limit allows twelve questions and hides quota UI', async ({ page 
   await page.goto('/');
   await expect(page.locator('.remaining')).toHaveCount(0);
   for (let index = 0; index < 12; index++) {
-    await page.getByRole('textbox', { name: '법률 질문' }).fill(`질문 ${index + 1}`);
+    await page.getByRole('textbox', { name: '질문' }).fill(`질문 ${index + 1}`);
     await page.getByRole('button', { name: '질문 보내기' }).click();
     await expect(page.locator('.assistant-body > p').last()).toHaveText(`답변 ${index + 1}`);
   }
   expect(lengths).toHaveLength(12);
   expect(lengths[11]).toBe(10);
-  await expect(page.getByRole('textbox', { name: '법률 질문' })).toBeEnabled();
+  await expect(page.getByRole('textbox', { name: '질문' })).toBeEnabled();
   await expect(page.locator('.remaining')).toHaveCount(0);
 });
 
@@ -112,9 +112,9 @@ test('pending question appears immediately, reply follows and history is sent', 
     await route.fulfill({ json: { success: true, data: { answer: '첫 답변\n다음 줄' } } });
   });
   await page.goto('/');
-  await page.getByRole('textbox', { name: '법률 질문' }).fill('첫 질문');
-  await page.getByRole('textbox', { name: '법률 질문' }).press('Enter');
-  await expect(page.getByRole('textbox', { name: '법률 질문' })).toHaveValue('');
+  await page.getByRole('textbox', { name: '질문' }).fill('첫 질문');
+  await page.getByRole('textbox', { name: '질문' }).press('Enter');
+  await expect(page.getByRole('textbox', { name: '질문' })).toHaveValue('');
   await expect(page.locator('.user-message')).toHaveText('첫 질문');
   await expect(page.getByRole('status', { name: 'AI가 답변을 준비하고 있어요' })).toBeVisible();
   const dots = page.locator('.typing-indicator > span');
@@ -128,8 +128,8 @@ test('pending question appears immediately, reply follows and history is sent', 
   finish();
   await expect(page.locator('.assistant-body > p')).toHaveText('첫 답변\n다음 줄');
   await expect(page.locator('.typing-indicator')).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: '법률 질문' })).toHaveValue('');
-  await page.getByRole('textbox', { name: '법률 질문' }).fill('후속 질문');
+  await expect(page.getByRole('textbox', { name: '질문' })).toHaveValue('');
+  await page.getByRole('textbox', { name: '질문' }).fill('후속 질문');
   await page.getByRole('button', { name: '질문 보내기' }).click();
   await expect(page.locator('.assistant-body > p').last()).toHaveText('첫 답변\n다음 줄');
   expect(requests[1]).toEqual({
@@ -149,13 +149,13 @@ test('failed answer restores question for retry and does not consume quota', asy
     }),
   );
   await page.goto('/');
-  await page.getByRole('textbox', { name: '법률 질문' }).fill('다시 보낼 질문');
+  await page.getByRole('textbox', { name: '질문' }).fill('다시 보낼 질문');
   await page.getByRole('button', { name: '질문 보내기' }).click();
   await expect(page.getByRole('alert')).toHaveText('AI 연결 설정이 필요해요.');
-  await expect(page.getByRole('textbox', { name: '법률 질문' })).toHaveValue('다시 보낼 질문');
+  await expect(page.getByRole('textbox', { name: '질문' })).toHaveValue('다시 보낼 질문');
   await expect(page.locator('.remaining b')).toHaveText('3');
   await expect(
-    page.getByRole('button', { name: '변호사에게 검증 요청', exact: true }),
+    page.getByRole('button', { name: '전문가에게 검증 요청', exact: true }),
   ).toBeHidden();
   await page.route('**/api/v1/chat', (route) =>
     route.fulfill({ json: { success: true, data: { answer: '재시도 성공' } } }),
@@ -194,18 +194,20 @@ test('first page, sample question, selected-question review, and reset', async (
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /복잡한 법률 고민/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /법률이 궁금할 때/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
   await page.getByRole('button', { name: /부동산·임대차/ }).click();
-  await expect(page.getByRole('textbox', { name: '법률 질문' })).toHaveValue(/보증금/);
+  await expect(page.getByRole('textbox', { name: '질문' })).toHaveValue(/보증금/);
   await page.getByRole('button', { name: '질문 보내기' }).click();
   await expect(page.getByText('질문에 대한 GPT 테스트 답변입니다.', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '변호사에게 검증 요청', exact: true }).click();
+  await page.getByRole('button', { name: '전문가에게 검증 요청', exact: true }).click();
   const dialog = page.locator('dialog[open]');
   await expect(
-    dialog.getByText('계약이 끝났는데 집주인이 보증금을 돌려주지 않아요.', { exact: true }),
+    dialog.getByText('계약이 끝났는데 집주인이 보증금을 돌려주지 않아요.', {
+      exact: true,
+    }),
   ).toBeVisible();
   await dialog.getByLabel('답변받을 이메일').fill('demo@example.com');
   await dialog.getByRole('checkbox').check();
@@ -213,11 +215,9 @@ test('first page, sample question, selected-question review, and reset', async (
   await expect(dialog.getByRole('heading', { name: /검증 요청 흐름을/ })).toBeVisible();
   await expect(dialog.getByText(/실제 접수나 이메일 발송은 하지 않았어요/)).toBeVisible();
   await dialog.getByRole('button', { name: '대화로 돌아가기' }).click();
-  if (await page.getByRole('button', { name: '메뉴 열기' }).isVisible())
-    await page.getByRole('button', { name: '메뉴 열기' }).click();
   await page.getByRole('button', { name: '새로운 질문 시작하기' }).click();
   await page.getByRole('button', { name: '새 대화 시작', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /복잡한 법률 고민/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /법률이 궁금할 때/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -227,11 +227,11 @@ test('guide dismisses with Escape; questions are sent to the chat API', async ({
     if (request.method() === 'POST') writes.push(request.url());
   });
   await page.goto('/');
-  await page.getByRole('button', { name: '어떻게 진행되나요?' }).click();
-  await expect(page.getByRole('heading', { name: '변호사 검증, 이렇게 진행돼요' })).toBeVisible();
+  await page.getByRole('button', { name: '이용 방법', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '전문가 검증, 이렇게 진행돼요' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('dialog[open]')).toHaveCount(0);
-  await page.getByRole('textbox', { name: '법률 질문' }).fill('테스트 질문');
+  await page.getByRole('textbox', { name: '질문' }).fill('테스트 질문');
   await page.getByRole('button', { name: '질문 보내기' }).click();
   await expect(page.getByText('질문에 대한 GPT 테스트 답변입니다.', { exact: true })).toBeVisible();
   expect(writes).toHaveLength(1);
@@ -255,7 +255,7 @@ test('three questions exhaust the session; only legal answers offer verification
     '보증금을 못 받았어요.',
     '점심 메뉴 추천해 줘',
   ].entries()) {
-    await page.getByRole('textbox', { name: '법률 질문' }).fill(question);
+    await page.getByRole('textbox', { name: '질문' }).fill(question);
     await page.getByRole('button', { name: '질문 보내기' }).click();
     await expect(page.locator('.assistant-body > p').last()).toHaveText(`답변 ${index + 1}`);
     await expect(page.locator('.remaining b')).toHaveText(String(2 - index));
@@ -263,13 +263,11 @@ test('three questions exhaust the session; only legal answers offer verification
       index === 1 ? 1 : 0,
     );
   }
-  await expect(page.getByRole('textbox', { name: '법률 질문' })).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: '질문' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '질문 보내기' })).toBeDisabled();
   expect(calls).toBe(3);
-  if (await page.getByRole('button', { name: '메뉴 열기' }).isVisible())
-    await page.getByRole('button', { name: '메뉴 열기' }).click();
   await page.getByRole('button', { name: '새로운 질문 시작하기' }).click();
   await page.getByRole('button', { name: '새 대화 시작', exact: true }).click();
   await expect(page.locator('.remaining b')).toHaveText('3');
-  await expect(page.getByRole('textbox', { name: '법률 질문' })).toBeEnabled();
+  await expect(page.getByRole('textbox', { name: '질문' })).toBeEnabled();
 });

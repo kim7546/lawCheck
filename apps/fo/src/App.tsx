@@ -3,22 +3,17 @@ import {
   ArrowRight,
   ArrowUp,
   BriefcaseBusiness,
-  Building2,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  CircleHelp,
-  Clock3,
-  FileCheck2,
-  HeartHandshake,
   House,
   Landmark,
+  HeartHandshake,
+  Check,
+  ChevronRight,
+  Clock3,
+  FileCheck2,
   LockKeyhole,
   Mail,
-  Menu,
   MessageCircle,
   Plus,
-  Scale,
   ShieldCheck,
   Sparkles,
   X,
@@ -52,16 +47,16 @@ const topics = [
   },
 ];
 const defaultConfig: PublicConfig = {
-  officeName: '법률사무소 IBS',
+  officeName: '',
   mode: 'prototype',
   maxQuestions: 3,
   questionLimitEnabled: false,
 };
 type InfoPanel = 'guide' | 'privacy' | 'notice' | null;
 
-function Brand({ small = false }: { small?: boolean }) {
+function Brand() {
   return (
-    <span className={`brand ${small ? 'brand-small' : ''}`}>
+    <span className="brand">
       <img className="brand-logo" src="/brand/logo.png" alt="aiqaver.com" />
     </span>
   );
@@ -107,7 +102,6 @@ export default function App() {
   const [question, setQuestion] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [loading, setLoading] = useState(false);
-  const [mobileNav, setMobileNav] = useState(false);
   const [info, setInfo] = useState<InfoPanel>(null);
   const [selectedTurn, setSelectedTurn] = useState<ChatTurn | null>(null);
   const [email, setEmail] = useState('');
@@ -185,11 +179,9 @@ export default function App() {
     setResetting(false);
     setQuestion('');
     setShowReset(false);
-    setMobileNav(false);
     composer.current?.focus();
   }
   function newConversation() {
-    setMobileNav(false);
     if (turns.length || question || loading || quota < 3) setShowReset(true);
     else composer.current?.focus();
   }
@@ -279,115 +271,33 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {mobileNav && (
-        <button
-          className="nav-backdrop"
-          aria-label="메뉴 닫기"
-          onClick={() => setMobileNav(false)}
-        />
-      )}
-      <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
-        <a href="/" className="brand-link" aria-label="aiqaver.com 홈">
-          <Brand />
-        </a>
-        <p className="sidebar-tagline">법률 고민의 첫 번째 대화</p>
-        <button className="new-chat" onClick={newConversation}>
-          <Plus size={18} />
-          새로운 질문 시작하기<span>↗</span>
-        </button>
-        <div className="sidebar-section-label">WORKSPACE</div>
-        <button
-          className="nav-item active"
-          onClick={() => {
-            setMobileNav(false);
-            composer.current?.focus();
-          }}
-        >
-          <MessageCircle size={18} />
-          법률 AI와 대화
-          <span className="live-dot" />
-        </button>
-        <button
-          className="nav-item"
-          onClick={() => {
-            setInfo('guide');
-            setMobileNav(false);
-          }}
-        >
-          <FileCheck2 size={18} />
-          변호사 검증 안내
-          <ChevronRight size={15} className="nav-chevron" />
-        </button>
-        <div className="conversation-history">
-          <div className="sidebar-section-label">이번 대화</div>
-          {turns.length ? (
-            turns.map((turn) => (
-              <button
-                key={turn.id}
-                onClick={() => {
-                  document.getElementById(turn.id)?.scrollIntoView({ behavior: 'smooth' });
-                  setMobileNav(false);
-                }}
-                className="history-item"
-              >
-                <MessageCircle size={14} />
-                <span>{turn.question}</span>
-              </button>
-            ))
-          ) : (
-            <p>
-              첫 질문을 남겨보세요.
-              <br />
-              대화가 여기에 표시됩니다.
-            </p>
-          )}
-        </div>
-        <div className="sidebar-bottom">
-          <div className="privacy-card">
-            <span className="privacy-icon">
-              <LockKeyhole size={17} />
-            </span>
-            <strong>이름 없이, 부담 없이</strong>
-            <p>
-              회원가입 없이 시작하세요.
-              <br />
-              검증을 원할 때만 이메일을 받아요.
-            </p>
-            <button onClick={() => setInfo('privacy')}>
-              개인정보 안내
-              <ArrowRight size={13} />
-            </button>
-          </div>
-          <button className="help-button" onClick={() => setInfo('guide')}>
-            <CircleHelp size={17} />
-            이용 방법 알아보기
-            <ArrowUp size={15} className="diagonal-arrow" />
-          </button>
-          <div className="sidebar-copyright">© 2026 aiqaver.com</div>
-        </div>
-      </aside>
-
       <div className="main-shell">
         <header className="topbar">
-          <div className="topbar-left">
-            <button
-              className="icon-button mobile-menu"
-              onClick={() => setMobileNav(true)}
-              aria-label="메뉴 열기"
-            >
-              <Menu size={21} />
+          <a href="/" className="brand-link" aria-label="aiqaver.com 홈">
+            <Brand />
+          </a>
+          <div className="header-actions">
+            <button className="header-guide" onClick={() => setInfo('guide')}>
+              이용 방법
             </button>
-            <span className="workspace-title">aiqaver.com</span>
-            <span className="beta-tag">PREVIEW</span>
+            <button
+              className="new-chat"
+              onClick={newConversation}
+              aria-label="새로운 질문 시작하기"
+            >
+              <Plus size={18} />새 질문
+            </button>
           </div>
-          <button className="office-chip" onClick={() => setInfo('guide')}>
-            <span className="office-avatar">
-              <Building2 size={15} />
-            </span>
-            <span>{config.officeName}</span>
-            <ChevronDown size={13} />
-          </button>
         </header>
+
+        <section className="top-ad-slot" aria-label="상단 광고 영역">
+          <img
+            src="/ads/legal-service-banner.png"
+            alt="광고: 어려운 법률문제, 혼자서 고민하지 마시고 박종학 변호사와 함께 해결해보세요. 전화 02-862-9905"
+            width={800}
+            height={175}
+          />
+        </section>
 
         <main className={`main-content ${turns.length ? 'has-conversation' : ''}`}>
           {!turns.length && !loading ? (
@@ -397,15 +307,14 @@ export default function App() {
                   <span /> AI · QUESTION · ANSWER · VERIFY
                 </span>
                 <h1>
-                  복잡한 법률 고민,
+                  법률이 궁금할 때,
                   <br />
-                  <span>질문에서 답을 찾으세요.</span>
+                  <span>AI에게 물어보세요.</span>
                 </h1>
                 <p>
-                  어디서부터 시작해야 할지 막막할 때,
-                  <br className="mobile-break" /> 편하게 이야기해 주세요.
-                  <br className="desktop-break" /> AI와 먼저 정리하고, 필요하면 변호사의 검토를
-                  받아보세요.
+                  <strong className="hero-verification">변호사가 검증해드립니다.</strong>
+                  법률 고민은 AI와 먼저 정리하고,
+                  <br className="mobile-break" /> 원하는 답변은 변호사에게 검증을 요청하세요.
                 </p>
                 <div className="hero-assurances">
                   <span>
@@ -426,7 +335,7 @@ export default function App() {
               </section>
             </>
           ) : (
-            <section className="conversation" aria-label="법률 대화" aria-live="polite">
+            <section className="conversation" aria-label="AI 대화" aria-live="polite">
               <div className="conversation-title">
                 <span className="eyebrow">
                   <span /> YOUR FIRST STEP
@@ -444,7 +353,7 @@ export default function App() {
                   <div className="user-message">{turn.question}</div>
                   <div className="assistant-message">
                     <span className="assistant-avatar">
-                      <Scale size={20} />
+                      <Sparkles size={20} />
                     </span>
                     <div className="assistant-body">
                       <div className="assistant-name">
@@ -479,7 +388,7 @@ export default function App() {
                           onClick={() => openVerification(turn)}
                         >
                           {turn.requested ? <Check size={16} /> : <ShieldCheck size={16} />}
-                          {turn.requested ? '검증 요청 체험 완료' : '변호사에게 검증 요청'}
+                          {turn.requested ? '검증 요청 체험 완료' : '전문가에게 검증 요청'}
                           <ArrowRight size={15} />
                         </button>
                       )}
@@ -492,11 +401,11 @@ export default function App() {
 
           <section className="composer-section" aria-label="질문 작성">
             <form className="composer" onSubmit={sendQuestion}>
-              <label htmlFor="legal-question" className="sr-only">
-                법률 질문
+              <label htmlFor="question" className="sr-only">
+                질문
               </label>
               <textarea
-                id="legal-question"
+                id="question"
                 ref={composer}
                 value={question}
                 maxLength={2000}
@@ -522,9 +431,9 @@ export default function App() {
               <div className="composer-toolbar">
                 <span className="composer-mode">
                   <Sparkles size={15} />
-                  법률 AI
+                  AI 어시스턴트
                   <span className="mode-divider" />
-                  GPT 연결
+                  질문하고 알아보세요
                 </span>
                 <div className="composer-actions">
                   {config.questionLimitEnabled && (
@@ -552,7 +461,7 @@ export default function App() {
           {!turns.length && (
             <section className="question-section" aria-labelledby="question-heading">
               <div className="section-heading">
-                <h2 id="question-heading">어떤 고민이 있으신가요?</h2>
+                <h2 id="question-heading">어떤 주제가 궁금하신가요?</h2>
                 <span>가까운 주제를 골라 시작해 보세요</span>
               </div>
               <div className="topic-grid">
@@ -571,30 +480,13 @@ export default function App() {
           )}
 
           {!turns.length && (
-            <section className="verification-promo">
-              <div className="promo-illustration">
-                <div className="illustration-back" />
-                <div className="illustration-page">
-                  <span />
-                  <span />
-                  <span />
-                  <ShieldCheck size={30} strokeWidth={1.5} />
-                </div>
-                <span className="illustration-spark">✧</span>
-              </div>
-              <div className="promo-copy">
-                <div className="mini-label">AI의 정리에, 전문가의 확인을 더하다</div>
-                <h2>조금 더 확실한 답변이 필요하다면</h2>
-                <p>
-                  궁금한 답변만 골라 변호사에게 검증을 요청하세요.
-                  <br />
-                  검토한 답변은 이메일로 편하게 받아볼 수 있어요.
-                </p>
-              </div>
-              <button className="promo-link" onClick={() => setInfo('guide')}>
-                어떻게 진행되나요?
-                <ArrowRight size={16} />
-              </button>
+            <section className="content-ad-slot" aria-label="주제 카드 아래 광고 영역">
+              <img
+                src="/ads/legal-service-banner.png"
+                alt="광고: 어려운 법률문제, 혼자서 고민하지 마시고 박종학 변호사와 함께 해결해보세요. 전화 02-862-9905"
+                width={800}
+                height={175}
+              />
             </section>
           )}
 
@@ -608,13 +500,13 @@ export default function App() {
             </span>
             <ChevronRight size={13} />
             <span>
-              <span className="step-number">3</span>필요한 질문만 변호사 검증
+              <span className="step-number">3</span>필요한 질문만 전문가 검증
             </span>
           </div>
           <footer className="main-footer">
             <p>
-              AI 답변은 일반적인 법률 정보이며, 개별 사건에 대한 변호사의 법률 자문을 대신하지
-              않습니다.
+              AI 답변에는 오류가 있을 수 있습니다. 중요한 결정에 활용하기 전에는 신뢰할 수 있는
+              자료나 전문가의 검토를 통해 확인하세요.
             </p>
             <div>
               <span className="demo-label">
@@ -634,7 +526,7 @@ export default function App() {
         <Dialog
           title={
             info === 'guide'
-              ? '변호사 검증, 이렇게 진행돼요'
+              ? '전문가 검증, 이렇게 진행돼요'
               : info === 'privacy'
                 ? '개인정보 안내'
                 : 'aiqaver.com 체험 안내'
@@ -643,11 +535,6 @@ export default function App() {
         >
           {info === 'guide' ? (
             <>
-              <div className="guide-office">
-                <Building2 size={19} />
-                <strong>{config.officeName}</strong>
-                <span>샘플 사무실</span>
-              </div>
               <ol className="guide-steps">
                 <li>
                   <MessageCircle size={21} />
@@ -666,13 +553,13 @@ export default function App() {
                 <li>
                   <Mail size={21} />
                   <div>
-                    <strong>변호사 답변을 이메일로</strong>
-                    <p>사무실이 담당자를 배정하면, 변호사가 검토 후 답변을 보내드려요.</p>
+                    <strong>전문가 답변을 이메일로</strong>
+                    <p>정식 서비스에서는 전문가가 검토한 답변을 이메일로 보내드려요.</p>
                   </div>
                 </li>
               </ol>
               <p className="info-callout">
-                현재는 체험 화면입니다. 실제 변호사 배정이나 이메일 발송은 이루어지지 않습니다.
+                현재는 체험 화면입니다. 실제 전문가 배정이나 이메일 발송은 이루어지지 않습니다.
               </p>
             </>
           ) : info === 'privacy' ? (
@@ -686,7 +573,7 @@ export default function App() {
                 정식 서비스에서는 질문과 AI 답변을 무기명으로 저장하고, 검증을 요청한 질문에 한해
                 이메일을 받습니다. 구체적인 보관기간과 처리 방침은 실제 서비스 공개 전에 안내합니다.
               </p>
-              <p>체험 시에도 실명·연락처·사건 관계자의 개인정보를 입력하지 마세요.</p>
+              <p>체험 시에도 실명·연락처·다른 사람의 개인정보를 입력하지 마세요.</p>
             </div>
           ) : (
             <div className="info-prose">
@@ -694,10 +581,9 @@ export default function App() {
                 aiqaver.com의 첫 화면과 질문·검증 요청 흐름을 확인할 수 있는 개발용 미리보기입니다.
               </p>
               <p>
-                답변은 GPT API로 생성됩니다. DB 대화 저장, 변호사 배정, 이메일 발송은 아직 연결되지
+                답변은 GPT API로 생성됩니다. DB 대화 저장, 전문가 배정, 이메일 발송은 아직 연결되지
                 않았습니다.
               </p>
-              <p>표시된 사무실명은 예시이며 실제 상담 접수를 의미하지 않습니다.</p>
             </div>
           )}
         </Dialog>
@@ -730,7 +616,7 @@ export default function App() {
         <div className="drawer-heading">
           <span>
             <ShieldCheck size={20} />
-            변호사 검증 요청
+            전문가 검증 요청
           </span>
           <button
             className="icon-button"
@@ -774,7 +660,7 @@ export default function App() {
             <p className="drawer-description">
               선택한 질문과 AI 답변만
               <br />
-              {config.officeName}에 전달됩니다.
+              검증 대상으로 선택됩니다.
             </p>
             <div className="selected-question">
               <span>검증을 요청할 질문</span>
@@ -794,7 +680,7 @@ export default function App() {
             />
             <p className="field-hint">
               <Mail size={13} />
-              변호사가 검토한 답변을 이메일로 보내드려요.
+              전문가가 검토한 답변을 이메일로 보내드려요.
             </p>
             <label className="consent-label">
               <input
@@ -803,7 +689,9 @@ export default function App() {
                 checked={consent}
                 onChange={(event) => setConsent(event.target.checked)}
               />
-              <span>선택한 질문·AI 답변과 이메일을 사무실에 전달하는 흐름을 확인했습니다.</span>
+              <span>
+                선택한 질문·AI 답변과 이메일을 검증 담당자에게 전달하는 흐름을 확인했습니다.
+              </span>
             </label>
             <div className="info-callout">
               체험용 폼입니다. 입력한 이메일은 전송·저장되지 않으며 실제 검증 요청은 접수되지
