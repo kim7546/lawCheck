@@ -61,7 +61,7 @@ npm run db:studio
 ```
 
 - `db:up`: PostgreSQL 시작 후 healthcheck가 성공할 때까지 대기.
-- `db:setup`: Prisma Client 생성 → 누적 migration 적용 → 사무실 seed → 접속·16개 테이블·사무실 확인.
+- `db:setup`: Prisma Client 생성 → 누적 migration 적용 → 사무실 seed → 접속·30개 업무 테이블·한글 논리명·사무실 확인.
 - `db:test`: 연결된 DB에서 합성 데이터로 무결성을 검증하고 전체 롤백. 개발 DB에서 실행합니다.
 - `db:studio`: 터미널에 표시된 주소(기본 `http://localhost:5555`)에서 테이블 조회.
 
@@ -120,6 +120,8 @@ FO·BO의 `API_PROXY_TARGET=https://<API 공개 도메인>` 설정은 그대로 
 `/api/v1/health`의 200은 HTTP 서버 상태만 의미하며 DB·OpenAI 연결 검사가 아닙니다.
 
 ## 5. 테이블과 무결성
+
+현재 전체 30개 업무 테이블의 한글 논리명과 컬럼 설명은 [데이터베이스 논리 스키마](database-logical-schema.md)를 기준으로 합니다. PostgreSQL의 테이블·컬럼 Comment와 Prisma `///` 주석에도 같은 내용을 적용했습니다. 아래 표는 초기 사무소 배정형 검증의 테이블 목록입니다. Office 회원은 `expert_accounts` 및 `expert_*` 관련 테이블에서 관리하며 `reviewer_` 테이블은 없습니다.
 
 | 영역                | 테이블                                                           |
 | ------------------- | ---------------------------------------------------------------- |

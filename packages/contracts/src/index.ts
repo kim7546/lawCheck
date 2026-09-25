@@ -3,6 +3,26 @@ export interface HealthResponse {
   data: { service: 'lawcheck-api'; status: 'ok'; mode: 'prototype' };
 }
 
+export type ExpertGroupCode = string;
+export interface CommonCodeRecord {
+  code: string;
+  name: string;
+  description: string;
+  sortOrder: number;
+  isActive: boolean;
+  updatedAt: string;
+}
+export type OfficeConsentKind = 'TERMS' | 'PRIVACY' | 'EXPERT_POLICY';
+export interface OfficeSignupConsent {
+  expertGroup: ExpertGroupCode;
+  consents: { kind: OfficeConsentKind; version: string; accepted: true }[];
+}
+export interface OfficeSignupPolicy {
+  officeGroup: ExpertGroupCode;
+  groups: { code: ExpertGroupCode; name: string; signupEnabled: boolean }[];
+  agreements: { kind: OfficeConsentKind; version: string; title: string; paragraphs: string[] }[];
+}
+
 export interface PublicConfig {
   officeName: string;
   mode: 'prototype';

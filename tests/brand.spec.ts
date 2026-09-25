@@ -23,9 +23,13 @@ test('question-first brand layout and logo fit the viewport', async ({ page }, t
     }),
   );
   await page.goto('/');
-  await expect(page).toHaveTitle(/aiqaver.com/);
+  await expect(page).toHaveTitle('AI QAVER | 질문에서 확신까지');
   await expect(page.locator('.sidebar')).toHaveCount(1);
-  await expect(page.getByRole('banner')).toContainText('AI QAVER');
+  await expect(page.locator('.workspace-title')).toHaveCount(0);
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    'href',
+    '/brand/aiqaver-symbol.png',
+  );
   await expect(page.getByRole('button', { name: '새로운 질문 시작하기' })).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/법률사무소|사무실/);
   await page.getByRole('button', { name: '이용 방법', exact: true }).click();
@@ -51,7 +55,7 @@ test('question-first brand layout and logo fit the viewport', async ({ page }, t
   await page.screenshot({ path: testInfo.outputPath('fo.png'), fullPage: true });
 });
 
-test('reviewer login replaces office management and fits the viewport', async ({
+test('expert login replaces office management and fits the viewport', async ({
   page,
 }, testInfo) => {
   await page.route('**/api/v1/bo/me', (route) =>
@@ -61,8 +65,12 @@ test('reviewer login replaces office management and fits the viewport', async ({
     }),
   );
   await page.goto('http://127.0.0.1:5174');
-  await expect(page).toHaveTitle(/aiqaver.com.*검증 게시판/);
-  await expect(page.getByRole('img', { name: 'aiqaver.com' })).toBeVisible();
+  await expect(page).toHaveTitle('AI QAVER Office | 전문가 검증 커뮤니티');
+  await expect(page.getByRole('img', { name: 'AI QAVER Office', exact: true })).toHaveAttribute(
+    'src',
+    '/brand/aiqaver-office.png',
+  );
+  await expect(page.getByRole('img', { name: 'AI QAVER Office', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/사무실|휴가 관리|변호사 관리/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

@@ -88,7 +88,7 @@ test('Free dashboard opens latest requests and community supports posting and re
   });
   await page.goto('http://127.0.0.1:5174');
   await expect(page.getByRole('heading', { name: '대시보드', exact: true })).toBeVisible();
-  await expect(page.getByText('Free', { exact: true })).toBeVisible();
+  await expect(page.getByText('FREE', { exact: true })).toBeVisible();
   await expect(page.locator('.dashboard-panel').first().locator('.board-row')).toHaveCount(5);
   await page.screenshot({ path: testInfo.outputPath('dashboard.png'), fullPage: true });
   await page.getByRole('button', { name: /최신 검증요청 1/ }).click();

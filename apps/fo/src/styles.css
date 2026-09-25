@@ -6,18 +6,14 @@ body {
   margin: 0;
   color: #24272c;
   background: #fff;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    'Malgun Gothic',
-    sans-serif;
+  font-family: var(--brand-font);
   font-size: 14px;
 }
 button,
 input,
-textarea {
+select,
+textarea,
+::file-selector-button {
   font: inherit;
 }
 button {
@@ -49,12 +45,23 @@ p {
   line-height: 1.8;
 }
 .app-shell {
+  --sidebar-width: 266px;
   display: flex;
   height: 100dvh;
   overflow: hidden;
 }
+.sidebar-slot {
+  width: var(--sidebar-width);
+  position: relative;
+  flex-shrink: 0;
+  transition: width 280ms cubic-bezier(0.2, 0, 0, 1);
+}
 .sidebar {
-  width: 266px;
+  width: var(--sidebar-width);
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  overflow: hidden;
   flex-shrink: 0;
   background: #f7f8fa;
   border-right: 1px solid #eceef1;
@@ -62,19 +69,69 @@ p {
   flex-direction: column;
   padding: 24px 14px 16px;
   gap: 5px;
+  transition:
+    width 280ms cubic-bezier(0.2, 0, 0, 1),
+    padding 280ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 280ms ease;
 }
 .sidebar-brand {
-  height: 47px;
+  position: relative;
+  flex-shrink: 0;
+  min-height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px;
-  margin-bottom: 22px;
+  margin-bottom: 9px;
+}
+.sidebar-logo {
+  position: relative;
+  width: calc(100% - 40px);
+  max-width: 185px;
+  height: 60px;
+  padding: 0;
+  border-radius: 10px;
+  flex-shrink: 0;
+  transition: width 280ms cubic-bezier(0.2, 0, 0, 1);
 }
 .brand-logo {
-  width: 163px;
-  height: auto;
-  mix-blend-mode: multiply;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 60px;
+  object-fit: contain;
+  transition:
+    opacity 180ms ease,
+    transform 280ms ease;
+}
+.brand-symbol {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 180ms ease;
+}
+.sidebar-toggle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: opacity 180ms ease;
+}
+.sidebar-text {
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  transition:
+    opacity 160ms ease,
+    max-width 280ms ease,
+    transform 280ms ease;
+}
+.sidebar .sidebar-search-toggle {
+  display: none;
 }
 .sidebar-action {
   width: 100%;
@@ -253,24 +310,6 @@ p {
   align-items: center;
   gap: 20px;
 }
-.workspace-title {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: 0.4px;
-  color: #3e4651;
-}
-.workspace-title svg {
-  color: #a4acb5;
-}
-.workspace-subtitle {
-  font-size: 11px;
-  color: #a2a8b0;
-  padding-left: 20px;
-  border-left: 1px solid #e9ebef;
-}
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -327,22 +366,6 @@ p {
   max-width: 730px;
   margin: auto;
 }
-.hero-symbol {
-  margin: 0 auto 22px;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #e9f0fb;
-  border-radius: 15px;
-  background: #f9fbff;
-}
-.hero-symbol img {
-  width: 33px;
-  height: 33px;
-  object-fit: contain;
-}
 .hero h1 {
   font-size: 31px;
   line-height: 1.5;
@@ -352,12 +375,21 @@ p {
   color: #2a3340;
 }
 .hero h1 span {
-  color: #2a3340;
+  color: var(--brand-blue);
 }
 .hero p {
   color: #929aa6;
   font-size: 12px;
   margin: 17px 0 8px;
+}
+.hero-verification {
+  display: block;
+  margin-bottom: 12px;
+  font-size: clamp(20px, 2.4vw, 24px);
+  line-height: 1.5;
+  letter-spacing: -0.5px;
+  word-break: keep-all;
+  color: var(--brand-blue);
 }
 .composer-section {
   flex-shrink: 0;
@@ -892,15 +924,81 @@ dialog::backdrop {
 .nav-backdrop {
   display: none;
 }
+@media (min-width: 761px) {
+  .sidebar-slot.compact {
+    width: 72px;
+  }
+  .sidebar.collapsed {
+    width: 72px;
+    padding: 24px 10px 16px;
+  }
+  .sidebar.collapsed .sidebar-logo {
+    width: 44px;
+  }
+  .sidebar.collapsed .brand-symbol {
+    opacity: 1;
+    visibility: visible;
+  }
+  .sidebar.collapsed .brand-logo,
+  .sidebar.collapsed .sidebar-toggle {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .sidebar.collapsed .brand-logo {
+    transform: translateX(-8px);
+  }
+  .sidebar.collapsed .sidebar-text,
+  .sidebar.collapsed .history-label,
+  .sidebar.collapsed .history-list {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .sidebar.collapsed .sidebar-text {
+    max-width: 0;
+    transform: translateX(-8px);
+  }
+  .history-label,
+  .history-list {
+    transition: opacity 180ms ease;
+  }
+  .sidebar.collapsed .new-chat-plus,
+  .sidebar.collapsed .search-field,
+  .sidebar.collapsed .sidebar-footer small,
+  .sidebar.collapsed .sidebar-retry {
+    display: none;
+  }
+  .sidebar.collapsed .sidebar-search-toggle {
+    display: flex;
+  }
+  .sidebar.collapsed .sidebar-action,
+  .sidebar.collapsed .sidebar-footer button {
+    justify-content: flex-start;
+    padding: 13px 16px;
+    gap: 0;
+  }
+  .sidebar.collapsed .sidebar-footer {
+    margin-top: auto;
+  }
+  .sidebar.collapsed .review-inbox {
+    position: relative;
+  }
+  .sidebar.collapsed .review-inbox .notification-badge {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 17px;
+    min-width: 17px;
+    font-size: 9px;
+  }
+}
 @media (max-width: 1100px) {
-  .sidebar {
-    width: 236px;
+  .app-shell {
+    --sidebar-width: 236px;
   }
   .topbar {
     padding: 0 24px;
-  }
-  .workspace-subtitle {
-    display: none;
   }
   .hero h1 {
     font-size: 27px;
@@ -922,11 +1020,17 @@ dialog::backdrop {
   }
 }
 @media (max-width: 760px) {
+  .sidebar-slot {
+    display: contents;
+  }
+  .desktop-only {
+    display: none;
+  }
   .mobile-only {
     display: inline-flex;
   }
   .sidebar {
-    display: none;
+    display: flex;
     position: fixed;
     left: 0;
     top: 0;
@@ -934,9 +1038,18 @@ dialog::backdrop {
     width: min(290px, 85vw);
     z-index: 30;
     box-shadow: 12px 0 40px #15243b20;
+    transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 280ms cubic-bezier(0.2, 0, 0, 1),
+      visibility 0s 280ms;
   }
   .sidebar.open {
-    display: flex;
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
   }
   .nav-backdrop {
     display: block;
@@ -944,6 +1057,18 @@ dialog::backdrop {
     inset: 0;
     background: #15243b55;
     z-index: 29;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 220ms ease,
+      visibility 0s 220ms;
+  }
+  .nav-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
   }
   .topbar {
     height: 59px;
@@ -951,9 +1076,6 @@ dialog::backdrop {
   }
   .topbar > div {
     gap: 10px;
-  }
-  .workspace-title {
-    font-size: 13px;
   }
   .conversation-pane {
     min-height: 0;
@@ -966,11 +1088,6 @@ dialog::backdrop {
     font-size: 11px;
     max-width: 270px;
     margin: 15px auto;
-  }
-  .hero-symbol {
-    width: 44px;
-    height: 44px;
-    margin-bottom: 20px;
   }
   .workspace-empty .conversation-pane {
     justify-content: flex-start;
@@ -994,14 +1111,23 @@ dialog::backdrop {
     margin-top: 9px;
   }
   .topic-grid {
-    max-width: 340px;
+    width: 100%;
+    max-width: 440px;
     margin: 0 auto;
-    padding: 14px 14px;
-    gap: 8px;
+    padding: 14px 8px;
+    flex-wrap: nowrap;
+    gap: 4px;
   }
   .topic-card {
-    font-size: 10px;
-    padding: 9px 12px;
+    flex: 0 0 auto;
+    gap: 3px;
+    font-size: clamp(9px, 2.56vw, 10px);
+    padding: 9px 5px;
+    white-space: nowrap;
+  }
+  .topic-card svg {
+    width: 12px;
+    height: 12px;
   }
   .content-ad-slot {
     margin-top: 25px;
@@ -1064,6 +1190,12 @@ dialog::backdrop {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .sidebar-slot,
+  .sidebar,
+  .sidebar *,
+  .nav-backdrop {
+    transition: none !important;
+  }
   *,
   *::before,
   *::after {

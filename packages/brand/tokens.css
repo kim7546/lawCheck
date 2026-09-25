@@ -1,7 +1,4 @@
 /* AI QAVER CI guide v1.0, p.2–3. Surface tints derive from the official palette. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
-
 :root {
   --brand-navy: #0b1f3b;
   --brand-blue: #2563eb;
@@ -12,5 +9,5 @@
   --brand-border: #dce5f0;
   --brand-soft: #eaf2ff;
   --brand-hover: #1d4ed8;
-  --brand-font: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  --brand-font: 'Malgun Gothic', '맑은 고딕', sans-serif;
 }

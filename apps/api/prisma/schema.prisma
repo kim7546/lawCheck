@@ -7,122 +7,273 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum ReviewerPlan {
-  FREE
-  PRO
-  BUSINESS
+/// 공통 코드 그룹: 전문가 직역, 요금제 등 코드 분류 관리
+model CommonCodeGroup {
+  /// 공통 코드 그룹 코드
+  code String @id @db.VarChar(50)
+  /// 공통 코드 그룹명
+  name String @db.VarChar(100)
+  /// 상세 설명
+  description String @default("") @db.VarChar(500)
+  /// 표시 순서: 작은 값부터 정렬
+  sortOrder Int @default(0) @map("sort_order")
+  /// 사용 여부
+  isActive Boolean @default(true) @map("is_active")
+  /// 생성 일시
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 최종 수정 일시
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  details CommonCodeDetail[]
+  @@map("common_code_groups")
 }
 
-model CommunityPost {
-  id String @id @default(uuid()) @db.Uuid
-  authorId String @map("author_id") @db.Uuid
-  title String @db.VarChar(200)
-  content String @db.Text
+/// 공통 코드 상세: 그룹별 코드값, 표시명, 정렬 및 사용 여부 관리
+model CommonCodeDetail {
+  /// 공통 코드 그룹 코드
+  groupCode String @map("group_code") @db.VarChar(50)
+  /// 공통 코드 상세 코드: 그룹 내 고유값
+  code String @db.VarChar(50)
+  /// 공통 코드 표시명
+  name String @db.VarChar(100)
+  /// 상세 설명
+  description String @default("") @db.VarChar(500)
+  /// 표시 순서: 작은 값부터 정렬
+  sortOrder Int @default(0) @map("sort_order")
+  /// 사용 여부
+  isActive Boolean @default(true) @map("is_active")
+  /// 생성 일시
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  author ReviewerAccount @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  /// 최종 수정 일시
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  group CommonCodeGroup @relation(fields: [groupCode], references: [code], onDelete: Restrict, onUpdate: Restrict)
+  expertAccounts ExpertAccount[] @relation("AccountExpertCode")
+  planAccounts ExpertAccount[] @relation("AccountPlanCode")
+  @@id([groupCode, code])
+  @@index([groupCode, sortOrder, code])
+  @@map("common_code_details")
+}
+
+enum OfficeConsentKind {
+  TERMS
+  PRIVACY
+  EXPERT_POLICY
+}
+
+/// 전문가 가입 동의 이력: 동의한 약관의 종류, 버전, 원문과 시각 보관
+model ExpertConsent {
+  /// 전문가 가입 동의 이력 식별자
+  id String @id @default(uuid()) @db.Uuid
+  /// 전문가 회원 식별자
+  accountId String @map("account_id") @db.Uuid
+  /// 동의 종류: TERMS 이용약관, PRIVACY 개인정보 수집·이용, EXPERT_POLICY 전문가 활동 약정
+  kind OfficeConsentKind
+  /// 동의 문안 버전
+  version String @db.VarChar(40)
+  /// 동의 문안 원본: 제목과 본문을 담은 JSON
+  document Json
+  /// 동의 일시
+  acceptedAt DateTime @default(now()) @map("accepted_at") @db.Timestamptz(3)
+  account ExpertAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@unique([accountId, kind, version])
+  @@map("expert_consents")
+}
+
+/// 전문가 커뮤니티 게시글: Office 회원의 자유 게시글
+model CommunityPost {
+  /// 전문가 커뮤니티 게시글 식별자
+  id String @id @default(uuid()) @db.Uuid
+  /// 작성 전문가 회원 식별자
+  authorId String @map("author_id") @db.Uuid
+  /// 게시글 제목
+  title String @db.VarChar(200)
+  /// 본문 내용
+  content String @db.Text
+  /// 생성 일시
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  author ExpertAccount @relation(fields: [authorId], references: [id], onDelete: Restrict)
   replies CommunityReply[]
   @@index([createdAt, id])
   @@map("community_posts")
 }
 
+/// 전문가 커뮤니티 댓글: 게시글에 등록한 답글
 model CommunityReply {
+  /// 전문가 커뮤니티 댓글 식별자
   id String @id @default(uuid()) @db.Uuid
+  /// 커뮤니티 게시글 식별자
   postId String @map("post_id") @db.Uuid
+  /// 작성 전문가 회원 식별자
   authorId String @map("author_id") @db.Uuid
+  /// 댓글 본문
   content String @db.Text
+  /// 생성 일시
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author ReviewerAccount @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  author ExpertAccount @relation(fields: [authorId], references: [id], onDelete: Restrict)
   @@index([postId, createdAt, id])
   @@map("community_replies")
 }
 
-model ReviewerAccount {
-  plan ReviewerPlan @default(FREE)
+/// 전문가 회원: Office 로그인 계정, 직역, 요금제 및 관리 권한
+model ExpertAccount {
+  /// 로그인 아이디: 소문자로 정규화한 영문·숫자·밑줄
+  username String? @unique @db.VarChar(30)
+  /// 클로즈 베타 가입코드: 선택 입력, 공개 계정 응답에 포함하지 않음
+  betaSignupCode String? @map("beta_signup_code") @db.VarChar(100)
+  lawyerProfile ExpertLawyerProfile?
+  /// 전문가 직역 코드: EXPERT_GROUP 그룹의 상세 코드
+  expertGroup String? @map("expert_group") @db.VarChar(50)
+  /// 전문가 직역의 공통 코드 그룹: EXPERT_GROUP 고정
+  expertCodeGroup String @default("EXPERT_GROUP") @map("expert_code_group") @db.VarChar(50)
+  expertCode CommonCodeDetail? @relation("AccountExpertCode", fields: [expertCodeGroup, expertGroup], references: [groupCode, code], onDelete: Restrict, onUpdate: Restrict)
+  /// 공통 코드 관리 권한 여부
+  canManageCodes Boolean @default(false) @map("can_manage_codes")
+  consents ExpertConsent[]
+  /// 요금제 코드: FREE, PRO, BUSINESS
+  plan String @default("FREE") @db.VarChar(50)
+  /// 요금제의 공통 코드 그룹: PLAN 고정
+  planCodeGroup String @default("PLAN") @map("plan_code_group") @db.VarChar(50)
+  planCode CommonCodeDetail @relation("AccountPlanCode", fields: [planCodeGroup, plan], references: [groupCode, code], onDelete: Restrict, onUpdate: Restrict)
   communityPosts CommunityPost[]
   communityReplies CommunityReply[]
+  /// 전문가 회원 식별자
   id String @id @default(uuid()) @db.Uuid
+  /// 이메일 주소
   email String @unique @db.VarChar(254)
+  /// 전문가 이름
   name String @db.VarChar(100)
+  /// 비밀번호 해시: 솔트와 키 유도 결과 저장, 평문 저장 금지
   passwordHash String @map("password_hash") @db.VarChar(255)
+  /// 생성 일시
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  sessions ReviewerLoginSession[]
-  reviews ReviewBoardPost[]
+  sessions ExpertLoginSession[]
   contributions ReviewContribution[]
-  @@map("reviewer_accounts")
+  @@map("expert_accounts")
 }
 
-model ReviewerLoginSession {
-  id String @id @default(uuid()) @db.Uuid
-  accountId String @map("account_id") @db.Uuid
-  tokenHash String @unique @map("token_hash") @db.VarChar(64)
-  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
-  account ReviewerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  @@index([expiresAt])
-  @@map("reviewer_login_sessions")
-}
-
-model ReviewBoardPost {
-  id String @id @default(uuid()) @db.Uuid
-  sessionId String @map("session_id") @db.Uuid
-  answerMessageId String @unique @map("answer_message_id") @db.Uuid
-  question String @db.Text
-  aiAnswer String @map("ai_answer") @db.Text
-  requesterEmail String @map("requester_email") @db.VarChar(254)
-  status String @default("REQUESTED") @db.VarChar(20)
-  reviewerId String? @map("reviewer_id") @db.Uuid
-  reply String? @db.Text
+/// 변호사 회원 상세: 변호사 가입 양식의 자격 정보와 사무소 연락처
+model ExpertLawyerProfile {
+  /// 전문가 회원 식별자
+  accountId String @id @map("account_id") @db.Uuid
+  /// 휴대전화 번호: 구분 기호를 제거한 숫자
+  mobilePhone String? @map("mobile_phone") @db.VarChar(20)
+  /// 변호사 등록 번호: 앞자리 0을 보존하는 문자열
+  registrationNumber String? @map("registration_number") @db.VarChar(50)
+  /// 변호사 신분증 발급번호: 자격 검증 완료를 의미하지 않음
+  issueNumber String? @map("issue_number") @db.VarChar(100)
+  /// 소속 법무법인 또는 사무소명
+  officeName String? @map("office_name") @db.VarChar(200)
+  /// 사무소 주소
+  address String? @db.VarChar(500)
+  /// 사무소 대표전화: 구분 기호를 제거한 숫자
+  officePhone String? @map("office_phone") @db.VarChar(20)
+  /// 생성 일시
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
-  reviewer ReviewerAccount? @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  account ExpertAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@map("expert_lawyer_profiles")
+}
+
+/// 전문가 로그인 세션: 인증 토큰 해시와 만료 시각
+model ExpertLoginSession {
+  /// 전문가 로그인 세션 식별자
+  id String @id @default(uuid()) @db.Uuid
+  /// 전문가 회원 식별자
+  accountId String @map("account_id") @db.Uuid
+  /// 인증 토큰의 SHA-256 해시: 원문 토큰 저장 금지
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  /// 만료 일시
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  account ExpertAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+  @@map("expert_login_sessions")
+}
+
+/// 검증 요청 게시글: 이용자가 검증을 요청한 질문과 인공지능 답변 원문
+model ReviewBoardPost {
+  /// 검증 요청 게시글 식별자
+  id String @id @default(uuid()) @db.Uuid
+  /// 채팅 세션 식별자
+  sessionId String @map("session_id") @db.Uuid
+  /// 검증 대상 인공지능 답변 메시지 식별자
+  answerMessageId String @unique @map("answer_message_id") @db.Uuid
+  /// 검증 요청 당시 질문 원문
+  question String @db.Text
+  /// 검증 요청 당시 인공지능 답변 원문
+  aiAnswer String @map("ai_answer") @db.Text
+  /// 검증 요청자 이메일
+  requesterEmail String @map("requester_email") @db.VarChar(254)
+  /// 생성 일시
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   contributions ReviewContribution[]
   choice ReviewChoice?
-  @@index([status, createdAt])
+  @@index([createdAt, id])
   @@index([sessionId])
   @@map("review_board_posts")
 }
 
+/// 전문가별 검증 답변: 요청별 전문가의 검토 상태와 제출 답변
 model ReviewContribution {
+  /// 전문가별 검증 답변 식별자
   id String @id @default(uuid()) @db.Uuid
+  /// 검증 요청 게시글 식별자
   postId String @map("post_id") @db.Uuid
-  reviewerId String @map("reviewer_id") @db.Uuid
+  /// 검증 담당 전문가 회원 식별자
+  expertId String @map("expert_id") @db.Uuid
+  /// 전문가별 검증 상태: REVIEWING 검토 중, COMPLETED 답변 완료
   status String @default("REVIEWING") @db.VarChar(20)
+  /// 전문가 검증 답변 내용
   reply String? @db.Text
+  /// 생성 일시
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 처리 완료 일시
   completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
   post ReviewBoardPost @relation(fields: [postId], references: [id], onDelete: Restrict)
-  reviewer ReviewerAccount @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  expert ExpertAccount @relation(fields: [expertId], references: [id], onDelete: Restrict)
   choices ReviewChoice[]
   reads FoReviewRead[]
-  @@unique([postId, reviewerId])
+  @@unique([postId, expertId])
   @@unique([postId, id])
-  @@index([reviewerId, status])
+  @@index([expertId, status])
   @@map("review_contributions")
 }
 
+/// 검증 답변 선택: 요청자가 최종 선택한 전문가 답변
 model ReviewChoice {
+  /// 검증 요청 게시글 식별자
   postId String @id @map("post_id") @db.Uuid
+  /// 전문가별 검증 답변 식별자
   contributionId String @map("contribution_id") @db.Uuid
+  /// 답변 선택 일시
   selectedAt DateTime @default(now()) @map("selected_at") @db.Timestamptz(3)
   post ReviewBoardPost @relation(fields: [postId], references: [id], onDelete: Restrict)
   contribution ReviewContribution @relation(fields: [postId, contributionId], references: [postId, id], onDelete: Restrict, onUpdate: NoAction)
   @@map("review_choices")
 }
 
+/// 이용자 브라우저: 익명 이용자의 대화 소유권과 현재 대화 관리
 model FoBrowser {
+  /// 이용자 브라우저 식별자
   id String @id @default(uuid()) @db.Uuid
+  /// 인증 토큰의 SHA-256 해시: 원문 토큰 저장 금지
   tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  /// 현재 선택한 채팅 세션 식별자
   activeSessionId String? @map("active_session_id") @db.Uuid
+  /// 만료 일시
   expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
   conversations FoConversation[]
   reads FoReviewRead[]
   @@map("fo_browsers")
 }
 
+/// 이용자 대화 목록: 브라우저와 채팅 세션의 연결
 model FoConversation {
+  /// 이용자 대화 목록 식별자
   id String @id @default(uuid()) @db.Uuid
+  /// 이용자 브라우저 식별자
   browserId String @map("browser_id") @db.Uuid
+  /// 채팅 세션 식별자
   sessionId String @unique @map("session_id") @db.Uuid
+  /// 생성 일시
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   browser FoBrowser @relation(fields: [browserId], references: [id], onDelete: Cascade)
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
@@ -130,9 +281,13 @@ model FoConversation {
   @@map("fo_conversations")
 }
 
+/// 검증 답변 읽음 이력: 브라우저별 답변 열람 시각
 model FoReviewRead {
+  /// 이용자 브라우저 식별자
   browserId String @map("browser_id") @db.Uuid
+  /// 전문가별 검증 답변 식별자
   contributionId String @map("contribution_id") @db.Uuid
+  /// 답변 읽음 일시
   readAt DateTime @default(now()) @map("read_at") @db.Timestamptz(3)
   browser FoBrowser @relation(fields: [browserId], references: [id], onDelete: Cascade)
   contribution ReviewContribution @relation(fields: [contributionId], references: [id], onDelete: Cascade)
@@ -140,16 +295,27 @@ model FoReviewRead {
   @@map("fo_review_reads")
 }
 
+/// 법률사무소: 사무소 식별, 운영 상태 및 서비스 설정
 model LawOffice {
+  /// 법률사무소 식별자
   id           String       @id @default(uuid()) @db.Uuid
+  /// 법률사무소 코드
   code         String       @unique @db.VarChar(50)
+  /// 법률사무소명
   name         String       @db.VarChar(200)
+  /// 사용 여부
   isActive     Boolean      @default(true) @map("is_active")
+  /// 사무소 대표 이메일
   contactEmail String?      @map("contact_email") @db.VarChar(254)
+  /// 사무소 전화번호
   phone        String?      @db.VarChar(40)
+  /// 사무소 상태: ACTIVE 운영, SUSPENDED 중지, CLOSED 폐업
   status       OfficeStatus @default(ACTIVE)
+  /// 사무소별 서비스 설정 JSON
   settings     Json         @default("{}")
+  /// 생성 일시
   createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 최종 수정 일시
   updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   lawyers       Lawyer[]
@@ -255,17 +421,29 @@ enum AuditActorType {
   SYSTEM
 }
 
+/// 사무소 소속 변호사: 사무소별 배정형 검증의 자격 승인 및 배정 대상
 model Lawyer {
+  /// 사무소 소속 변호사 식별자
   id                       String                @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId              String                @map("law_office_id") @db.Uuid
+  /// 변호사 이름
   name                     String                @db.VarChar(100)
+  /// 이메일 주소
   email                    String                @db.VarChar(254)
+  /// 변호사 등록 번호: 앞자리 0을 보존하는 문자열
   registrationNumber       String?               @map("registration_number") @db.VarChar(50)
+  /// 자격 승인 상태: PENDING 대기, APPROVED 승인, REJECTED 반려
   approvalStatus           ApprovalStatus        @default(PENDING) @map("approval_status")
+  /// 사용 여부
   isActive                 Boolean               @default(true) @map("is_active")
+  /// 검증 요청 배정 가능 여부
   assignmentEnabled        Boolean               @default(false) @map("assignment_enabled")
+  /// 검증 초대 이메일 수신 여부
   receiveVerificationEmail Boolean               @default(false) @map("receive_verification_email")
+  /// 생성 일시
   createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 최종 수정 일시
   updatedAt                DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   lawOffice                LawOffice             @relation(fields: [lawOfficeId], references: [id], onDelete: Restrict)
   staffAccount             StaffAccount?
@@ -284,15 +462,25 @@ model Lawyer {
   @@map("lawyers")
 }
 
+/// 사무소 직원 계정: 사무소별 관리자의 역할과 인증 정보
 model StaffAccount {
+  /// 사무소 직원 계정 식별자
   id                 String              @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId        String              @map("law_office_id") @db.Uuid
+  /// 사무소 소속 변호사 식별자
   lawyerId           String?             @unique @map("lawyer_id") @db.Uuid
+  /// 이메일 주소
   email              String              @db.VarChar(254)
+  /// 비밀번호 해시: 솔트와 키 유도 결과 저장, 평문 저장 금지
   passwordHash       String              @map("password_hash") @db.VarChar(255)
+  /// 직원 역할: OFFICE_ADMIN 사무소 관리자, DISPATCHER 배정 담당, LAWYER 변호사
   role               StaffRole
+  /// 직원 계정 상태: ACTIVE 사용, SUSPENDED 중지, CLOSED 폐쇄
   status             AccountStatus       @default(ACTIVE)
+  /// 생성 일시
   createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 최종 수정 일시
   updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
   lawOffice          LawOffice           @relation(fields: [lawOfficeId], references: [id], onDelete: Restrict)
   lawyer             Lawyer?             @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
@@ -307,13 +495,21 @@ model StaffAccount {
   @@map("staff_accounts")
 }
 
+/// 사무소 직원 로그인 세션: 직원 계정의 인증 만료 및 폐기 관리
 model StaffSession {
+  /// 사무소 직원 로그인 세션 식별자
   id             String       @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId    String       @map("law_office_id") @db.Uuid
+  /// 사무소 직원 계정 식별자
   staffAccountId String       @map("staff_account_id") @db.Uuid
+  /// 인증 토큰의 SHA-256 해시: 원문 토큰 저장 금지
   tokenHash      String       @unique @map("token_hash") @db.VarChar(64)
+  /// 만료 일시
   expiresAt      DateTime     @map("expires_at") @db.Timestamptz(3)
+  /// 인증 폐기 일시: NULL이면 미폐기
   revokedAt      DateTime?    @map("revoked_at") @db.Timestamptz(3)
+  /// 생성 일시
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   staffAccount   StaffAccount @relation(fields: [lawOfficeId, staffAccountId], references: [lawOfficeId, id], onDelete: Restrict)
 
@@ -321,15 +517,25 @@ model StaffSession {
   @@map("staff_sessions")
 }
 
+/// 변호사 재직 이력: 사무소 소속 변호사의 입사와 퇴사 기간
 model LawyerEmployment {
+  /// 변호사 재직 이력 식별자
   id          String           @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId String           @map("law_office_id") @db.Uuid
+  /// 사무소 소속 변호사 식별자
   lawyerId    String           @map("lawyer_id") @db.Uuid
+  /// 입사 일시
   startsAt    DateTime         @map("starts_at") @db.Timestamptz(3)
+  /// 퇴사 일시: NULL이면 종료 미정
   endsAt      DateTime?        @map("ends_at") @db.Timestamptz(3)
+  /// 재직 상태: SCHEDULED 입사 예정, ACTIVE 재직, ENDED 퇴사, CANCELLED 취소
   status      EmploymentStatus @default(SCHEDULED)
+  /// 등록한 직원 계정 식별자
   createdBy   String           @map("created_by") @db.Uuid
+  /// 생성 일시
   createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 최종 수정 일시
   updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
   lawyer      Lawyer           @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
   creator     StaffAccount     @relation(fields: [lawOfficeId, createdBy], references: [lawOfficeId, id], onDelete: Restrict)
@@ -338,15 +544,25 @@ model LawyerEmployment {
   @@map("lawyer_employments")
 }
 
+/// 변호사 휴가 이력: 검증 배정에서 제외할 휴가 기간과 승인 상태
 model LawyerLeave {
+  /// 변호사 휴가 이력 식별자
   id          String        @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId String        @map("law_office_id") @db.Uuid
+  /// 사무소 소속 변호사 식별자
   lawyerId    String        @map("lawyer_id") @db.Uuid
+  /// 휴가 시작 일시
   startsAt    DateTime      @map("starts_at") @db.Timestamptz(3)
+  /// 휴가 종료 일시
   endsAt      DateTime      @map("ends_at") @db.Timestamptz(3)
+  /// 휴가 상태: PENDING 승인 대기, APPROVED 승인, CANCELLED 취소
   status      LeaveStatus   @default(PENDING)
+  /// 승인한 직원 계정 식별자
   approvedBy  String?       @map("approved_by") @db.Uuid
+  /// 생성 일시
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 최종 수정 일시
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   lawyer      Lawyer        @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
   approver    StaffAccount? @relation(fields: [lawOfficeId, approvedBy], references: [lawOfficeId, id], onDelete: Restrict)
@@ -355,15 +571,24 @@ model LawyerLeave {
   @@map("lawyer_leaves")
 }
 
+/// 채팅 세션: 익명 대화의 질문 횟수, 소속 사무소 및 만료 관리
 model ChatSession {
   foConversation FoConversation?
+  /// 채팅 세션 식별자
   id                   String                @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId          String                @map("law_office_id") @db.Uuid
+  /// 채팅 세션 토큰의 SHA-256 해시
   sessionTokenHash     String                @unique @map("session_token_hash") @db.VarChar(64)
+  /// 사용한 질문 횟수
   questionCount        Int                   @default(0) @map("question_count")
+  /// 최대 질문 횟수: NULL이면 제한 없음
   maxQuestionCount     Int?                  @default(3) @map("max_question_count")
+  /// 만료 일시
   expiresAt            DateTime              @map("expires_at") @db.Timestamptz(3)
+  /// 생성 일시
   createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 최종 수정 일시
   updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   lawOffice            LawOffice             @relation(fields: [lawOfficeId], references: [id], onDelete: Restrict)
   messages             ChatMessage[]
@@ -374,20 +599,34 @@ model ChatSession {
   @@map("chat_sessions")
 }
 
+/// 채팅 메시지: 이용자 질문, 인공지능 답변 및 처리 상태
 model ChatMessage {
+  /// 채팅 메시지 식별자
   id               String                @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId      String                @map("law_office_id") @db.Uuid
+  /// 채팅 세션 식별자
   sessionId        String                @map("session_id") @db.Uuid
+  /// 상위 메시지 식별자: 인공지능 답변이 대응하는 질문
   parentMessageId  String?               @map("parent_message_id") @db.Uuid
   // Supplied by the client once per question, reused for retries; null for generated messages.
+  /// 질문 재시도 중복 방지 키: 클라이언트가 질문별 생성하며 자동 생성 메시지는 NULL
   requestKey       String?               @map("request_key") @db.VarChar(100)
+  /// 메시지 작성 주체: USER 이용자, ASSISTANT 인공지능, SYSTEM 시스템
   role             MessageRole
+  /// 메시지 종류: USER_QUESTION 질문, AI_ANSWER 답변, NON_LEGAL_NOTICE 비법률 안내, SYSTEM_NOTICE 시스템 안내
   messageType      MessageType           @map("message_type")
+  /// 본문 내용
   content          String                @db.Text
+  /// 개인정보 등을 정제한 메시지 내용
   sanitizedContent String?               @map("sanitized_content") @db.Text
+  /// 채팅 세션 내 메시지 순번
   sequenceNo       Int                   @map("sequence_no")
+  /// 메시지 처리 상태: RECEIVED 접수, PROCESSING 처리 중, COMPLETED 완료, FAILED 실패
   processingStatus ProcessingStatus      @default(RECEIVED) @map("processing_status")
+  /// 메시지 부가 정보 JSON
   metadata         Json                  @default("{}")
+  /// 생성 일시
   createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   session          ChatSession           @relation(fields: [lawOfficeId, sessionId], references: [lawOfficeId, id], onDelete: Restrict)
   parent           ChatMessage?          @relation("MessageParent", fields: [lawOfficeId, sessionId, parentMessageId], references: [lawOfficeId, sessionId, id], onDelete: Restrict, onUpdate: NoAction)
@@ -404,25 +643,45 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
+/// 사무소 배정형 검증 요청: 질문과 답변의 원문, 담당 변호사 및 처리 상태
 model VerificationRequest {
+  /// 사무소 배정형 검증 요청 식별자
   id                String              @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId       String              @map("law_office_id") @db.Uuid
+  /// 채팅 세션 식별자
   sessionId         String              @map("session_id") @db.Uuid
+  /// 검증 대상 질문 메시지 식별자
   questionMessageId String              @map("question_message_id") @db.Uuid
+  /// 검증 대상 인공지능 답변 메시지 식별자
   aiAnswerMessageId String              @unique @map("ai_answer_message_id") @db.Uuid
+  /// 검증 요청자 이메일
   requesterEmail    String              @map("requester_email") @db.VarChar(254)
+  /// 요청자가 추가한 상황 설명
   additionalContext String?             @map("additional_context") @db.Text
+  /// 검증 요청 시점의 질문 원문 사본
   questionSnapshot  String              @map("question_snapshot") @db.Text
+  /// 검증 요청 시점의 인공지능 답변 원문 사본
   aiAnswerSnapshot  String              @map("ai_answer_snapshot") @db.Text
+  /// 검증 처리 상태: REQUESTED 요청, ASSIGNED 배정, REVIEWING 검토, ANSWERED 답변, EXPIRED 만료, REJECTED 반려
   status            VerificationStatus  @default(REQUESTED)
+  /// 현재 배정된 사무소 소속 변호사 식별자
   assignedLawyerId  String?             @map("assigned_lawyer_id") @db.Uuid
+  /// 검증 배정 버전: 재배정 시 증가
   assignmentVersion Int                 @default(0) @map("assignment_version")
+  /// 검증 요청 일시
   requestedAt       DateTime            @default(now()) @map("requested_at") @db.Timestamptz(3)
+  /// 담당자 배정 일시
   assignedAt        DateTime?           @map("assigned_at") @db.Timestamptz(3)
+  /// 담당자의 검토 수락 일시
   claimedAt         DateTime?           @map("claimed_at") @db.Timestamptz(3)
+  /// 처리 완료 일시
   completedAt       DateTime?           @map("completed_at") @db.Timestamptz(3)
+  /// 만료 일시
   expiresAt         DateTime            @map("expires_at") @db.Timestamptz(3)
+  /// 생성 일시
   createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 최종 수정 일시
   updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
   session           ChatSession         @relation(fields: [lawOfficeId, sessionId], references: [lawOfficeId, id], onDelete: Restrict)
   question          ChatMessage         @relation("SelectedQuestion", fields: [lawOfficeId, sessionId, questionMessageId], references: [lawOfficeId, sessionId, id], onDelete: Restrict)
@@ -441,15 +700,25 @@ model VerificationRequest {
   @@map("verification_requests")
 }
 
+/// 변호사 검증 초대: 배정된 변호사의 검토 링크 인증 정보
 model ReviewInvitation {
+  /// 변호사 검증 초대 식별자
   id                    String              @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId           String              @map("law_office_id") @db.Uuid
+  /// 사무소 배정형 검증 요청 식별자
   verificationRequestId String              @map("verification_request_id") @db.Uuid
+  /// 사무소 소속 변호사 식별자
   lawyerId              String              @map("lawyer_id") @db.Uuid
+  /// 검증 배정 버전: 재배정 시 증가
   assignmentVersion     Int                 @map("assignment_version")
+  /// 인증 토큰의 SHA-256 해시: 원문 토큰 저장 금지
   tokenHash             String              @unique @map("token_hash") @db.VarChar(64)
+  /// 만료 일시
   expiresAt             DateTime            @map("expires_at") @db.Timestamptz(3)
+  /// 인증 폐기 일시: NULL이면 미폐기
   revokedAt             DateTime?           @map("revoked_at") @db.Timestamptz(3)
+  /// 생성 일시
   createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   request               VerificationRequest @relation(fields: [lawOfficeId, verificationRequestId], references: [lawOfficeId, id], onDelete: Restrict)
   lawyer                Lawyer              @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
@@ -462,14 +731,23 @@ model ReviewInvitation {
   @@map("review_invitations")
 }
 
+/// 변호사 검증 세션: 초대 링크로 생성한 검토 인증 세션
 model ReviewSession {
+  /// 변호사 검증 세션 식별자
   id                    String           @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId           String           @map("law_office_id") @db.Uuid
+  /// 사무소 배정형 검증 요청 식별자
   verificationRequestId String           @map("verification_request_id") @db.Uuid
+  /// 변호사 검증 초대 식별자
   invitationId          String           @map("invitation_id") @db.Uuid
+  /// 인증 토큰의 SHA-256 해시: 원문 토큰 저장 금지
   tokenHash             String           @unique @map("token_hash") @db.VarChar(64)
+  /// 만료 일시
   expiresAt             DateTime         @map("expires_at") @db.Timestamptz(3)
+  /// 인증 폐기 일시: NULL이면 미폐기
   revokedAt             DateTime?        @map("revoked_at") @db.Timestamptz(3)
+  /// 생성 일시
   createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   invitation            ReviewInvitation @relation(fields: [lawOfficeId, verificationRequestId, invitationId], references: [lawOfficeId, verificationRequestId, id], onDelete: Restrict)
 
@@ -477,15 +755,25 @@ model ReviewSession {
   @@map("review_sessions")
 }
 
+/// 검증 배정 이력: 담당 변호사 변경과 변경 사유 기록
 model AssignmentHistory {
+  /// 검증 배정 이력 식별자
   id                    String              @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId           String              @map("law_office_id") @db.Uuid
+  /// 사무소 배정형 검증 요청 식별자
   verificationRequestId String              @map("verification_request_id") @db.Uuid
+  /// 검증 배정 버전: 재배정 시 증가
   assignmentVersion     Int                 @map("assignment_version")
+  /// 변경 전 담당 변호사 식별자
   fromLawyerId          String?             @map("from_lawyer_id") @db.Uuid
+  /// 변경 후 담당 변호사 식별자
   toLawyerId            String?             @map("to_lawyer_id") @db.Uuid
+  /// 담당자 변경 사유
   reason                String              @db.Text
+  /// 배정 변경을 수행한 직원 계정 식별자
   actorStaffId          String?             @map("actor_staff_id") @db.Uuid
+  /// 생성 일시
   createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   request               VerificationRequest @relation(fields: [lawOfficeId, verificationRequestId], references: [lawOfficeId, id], onDelete: Restrict)
   fromLawyer            Lawyer?             @relation("PreviousLawyer", fields: [lawOfficeId, fromLawyerId], references: [lawOfficeId, id], onDelete: Restrict)
@@ -497,14 +785,23 @@ model AssignmentHistory {
   @@map("assignment_history")
 }
 
+/// 사무소 배정형 변호사 답변: 배정 버전에 따른 검증 결과와 제출 내용
 model LawyerReply {
+  /// 사무소 배정형 변호사 답변 식별자
   id                    String              @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId           String              @map("law_office_id") @db.Uuid
+  /// 사무소 배정형 검증 요청 식별자
   verificationRequestId String              @unique @map("verification_request_id") @db.Uuid
+  /// 사무소 소속 변호사 식별자
   lawyerId              String              @map("lawyer_id") @db.Uuid
+  /// 검증 배정 버전: 재배정 시 증가
   assignmentVersion     Int                 @map("assignment_version")
+  /// 검증 결과: GENERALLY_VALID 대체로 타당, PARTIALLY_VALID 일부 타당, IMPORTANT_OMISSION 중요 누락, MORE_FACTS_NEEDED 사실 보완 필요, CONSULTATION_RECOMMENDED 상담 권장, AI_ANSWER_INAPPROPRIATE 부적절한 답변
   resultType            ReviewResult        @map("result_type")
+  /// 변호사 검증 답변 본문
   replyBody             String              @map("reply_body") @db.Text
+  /// 검증 답변 제출 일시
   submittedAt           DateTime            @default(now()) @map("submitted_at") @db.Timestamptz(3)
   request               VerificationRequest @relation(fields: [lawOfficeId, verificationRequestId], references: [lawOfficeId, id], onDelete: Restrict)
   lawyer                Lawyer              @relation(fields: [lawOfficeId, lawyerId], references: [lawOfficeId, id], onDelete: Restrict)
@@ -516,24 +813,42 @@ model LawyerReply {
   @@map("lawyer_replies")
 }
 
+/// 이메일 발송 대기열: 검증 초대와 답변 알림의 발송 및 재시도 관리
 model EmailOutbox {
+  /// 이메일 발송 대기열 식별자
   id                    String                 @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId           String                 @map("law_office_id") @db.Uuid
+  /// 사무소 배정형 검증 요청 식별자
   verificationRequestId String                 @map("verification_request_id") @db.Uuid
+  /// 변호사 검증 초대 식별자
   invitationId          String?                @map("invitation_id") @db.Uuid
+  /// 변호사 제출 답변 식별자
   replyId               String?                @map("reply_id") @db.Uuid
+  /// 수신자 이메일 주소
   recipient             String                 @db.VarChar(254)
+  /// 이메일 종류: LAWYER_REVIEW_INVITATION 검증 초대, USER_LAWYER_REPLY 답변 알림
   eventType             EmailEventType         @map("event_type")
+  /// 이메일 중복 발송 방지 키
   deduplicationKey      String                 @unique @map("deduplication_key") @db.VarChar(200)
+  /// 발송 상태: PENDING 대기, SENDING 발송 중, SENT 성공, FAILED 실패, CANCELLED 취소
   status                EmailStatus            @default(PENDING)
+  /// 누적 발송 시도 횟수
   attemptCount          Int                    @default(0) @map("attempt_count")
+  /// 다음 발송 시도 예정 일시
   nextAttemptAt         DateTime               @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  /// 발송 작업 점유 만료 일시
   leaseUntil            DateTime?              @map("lease_until") @db.Timestamptz(3)
+  /// 이메일 제공자가 부여한 메시지 식별자
   providerMessageId     String?                @map("provider_message_id") @db.VarChar(255)
+  /// 마지막 발송 오류 코드
   lastErrorCode         String?                @map("last_error_code") @db.VarChar(100)
   // Authenticated encryption payload only; never a raw invitation URL/token.
+  /// 인증된 암호화 방식으로 보호한 발송 데이터: 초대 URL과 토큰의 평문 저장 금지
   encryptedPayload      Bytes?                 @map("encrypted_payload")
+  /// 발송 성공 일시
   sentAt                DateTime?              @map("sent_at") @db.Timestamptz(3)
+  /// 생성 일시
   createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   request               VerificationRequest    @relation(fields: [lawOfficeId, verificationRequestId], references: [lawOfficeId, id], onDelete: Restrict)
   invitation            ReviewInvitation?      @relation(fields: [lawOfficeId, verificationRequestId, invitationId], references: [lawOfficeId, verificationRequestId, id], onDelete: Restrict)
@@ -546,15 +861,25 @@ model EmailOutbox {
   @@map("email_outbox")
 }
 
+/// 이메일 발송 시도 이력: 시도별 결과, 오류와 처리 시간
 model EmailDeliveryAttempt {
+  /// 이메일 발송 시도 이력 식별자
   id                String      @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId       String      @map("law_office_id") @db.Uuid
+  /// 이메일 발송 대기열 식별자
   emailOutboxId     String      @map("email_outbox_id") @db.Uuid
+  /// 발송 시도 순번
   attemptNo         Int         @map("attempt_no")
+  /// 발송 상태: PENDING 대기, SENDING 발송 중, SENT 성공, FAILED 실패, CANCELLED 취소
   status            EmailStatus
+  /// 이메일 제공자가 부여한 메시지 식별자
   providerMessageId String?     @map("provider_message_id") @db.VarChar(255)
+  /// 발송 오류 코드
   errorCode         String?     @map("error_code") @db.VarChar(100)
+  /// 발송 시도 시작 일시
   startedAt         DateTime    @default(now()) @map("started_at") @db.Timestamptz(3)
+  /// 발송 시도 종료 일시
   finishedAt        DateTime?   @map("finished_at") @db.Timestamptz(3)
   outbox            EmailOutbox @relation(fields: [lawOfficeId, emailOutboxId], references: [lawOfficeId, id], onDelete: Restrict)
 
@@ -563,14 +888,23 @@ model EmailDeliveryAttempt {
   @@map("email_delivery_attempts")
 }
 
+/// 감사 이력: 사무소별 행위 주체와 업무 변경 대상 기록
 model AuditLog {
+  /// 감사 이력 식별자
   id          String         @id @default(uuid()) @db.Uuid
+  /// 소속 법률사무소 식별자
   lawOfficeId String         @map("law_office_id") @db.Uuid
+  /// 행위 주체 종류: ANONYMOUS_SESSION 익명 이용자, STAFF 직원, LAWYER_REVIEW_SESSION 검토 변호사, SYSTEM 시스템
   actorType   AuditActorType @map("actor_type")
+  /// 행위 주체 식별자: 시스템 행위는 NULL 가능
   actorId     String?        @map("actor_id") @db.Uuid
+  /// 수행한 업무 행위 코드
   action      String         @db.VarChar(100)
+  /// 업무 대상 종류
   entityType  String         @map("entity_type") @db.VarChar(100)
+  /// 업무 대상 식별자
   entityId    String         @map("entity_id") @db.Uuid
+  /// 생성 일시
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   lawOffice   LawOffice      @relation(fields: [lawOfficeId], references: [id], onDelete: Restrict)
 

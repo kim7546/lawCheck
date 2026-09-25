@@ -64,7 +64,7 @@ type Review = {
     reply: string;
     unread: boolean;
     completedAt: string;
-    reviewer: { name: string };
+    expert: { name: string };
   }[];
 };
 type History = {
@@ -174,6 +174,16 @@ export default function App() {
   const currentIdRef = useRef('draft');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileViewport, setMobileViewport] = useState(
+    () => window.matchMedia('(max-width: 760px)').matches,
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('aiqaver.sidebar.collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -195,7 +205,9 @@ export default function App() {
   const latestTurn = useRef<HTMLElement>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const sidebar = useRef<HTMLElement>(null);
+  const sidebarLogo = useRef<HTMLButtonElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
   const localDrafts = useRef(new Map<string, ChatTurn[]>());
   const remaining = Math.max(0, quota - (loading ? 1 : 0));
   const limitReached = config.questionLimitEnabled && remaining === 0;
@@ -293,12 +305,28 @@ export default function App() {
     return () => cancelAnimationFrame(frame);
   }, [latestId, latestStatus]);
   useEffect(() => {
-    if (!sidebarOpen) return;
-    sidebar.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const viewport = window.matchMedia('(max-width: 760px)');
+    const sync = () => {
+      setMobileViewport(viewport.matches);
+      setSidebarOpen(false);
+    };
+    viewport.addEventListener('change', sync);
+    return () => viewport.removeEventListener('change', sync);
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('aiqaver.sidebar.collapsed', String(sidebarCollapsed));
+    } catch {
+      // Sidebar controls also work when browser storage is unavailable.
+    }
+  }, [sidebarCollapsed]);
+  useEffect(() => {
+    if (!sidebarOpen || !mobileViewport) return;
+    sidebar.current?.querySelector<HTMLButtonElement>('.mobile-only')?.focus();
     const trap = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setSidebarOpen(false);
-        menuButton.current?.focus();
+        requestAnimationFrame(() => menuButton.current?.focus());
       }
       if (event.key !== 'Tab' || !window.matchMedia('(max-width: 760px)').matches) return;
       const elements = Array.from(
@@ -316,7 +344,7 @@ export default function App() {
     };
     document.addEventListener('keydown', trap);
     return () => document.removeEventListener('keydown', trap);
-  }, [sidebarOpen]);
+  }, [sidebarOpen, mobileViewport]);
 
   async function newConversation() {
     if (loading || switching || !ready) return;
@@ -539,126 +567,183 @@ export default function App() {
   );
   return (
     <div className="app-shell">
-      {sidebarOpen && (
-        <button
-          className="nav-backdrop"
-          aria-label="메뉴 닫기"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-      <aside
-        ref={sidebar}
-        className={`sidebar ${sidebarOpen ? 'open' : ''}`}
-        aria-label="대화 이력"
-      >
-        <div className="sidebar-brand">
-          <img className="brand-logo" src="/brand/logo.png" alt="aiqaver.com" />
-          <button
-            className="icon-button mobile-only"
-            aria-label="사이드바 닫기"
-            onClick={() => {
-              setSidebarOpen(false);
-              menuButton.current?.focus();
-            }}
-          >
-            <PanelLeftClose size={20} />
-          </button>
-        </div>
-        <button
-          className="sidebar-action new-chat"
-          aria-label="새로운 질문 시작하기"
-          disabled={loading || switching || !ready}
-          onClick={() => void newConversation()}
+      <button
+        className={`nav-backdrop ${sidebarOpen ? 'active' : ''}`}
+        aria-label="메뉴 닫기"
+        aria-hidden={!sidebarOpen}
+        tabIndex={-1}
+        onClick={() => setSidebarOpen(false)}
+      />
+      <div className={`sidebar-slot ${sidebarCollapsed ? 'compact' : ''}`}>
+        <aside
+          ref={sidebar}
+          id="conversation-sidebar"
+          className={`sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}
+          aria-label="대화 이력"
+          aria-hidden={mobileViewport && !sidebarOpen ? true : undefined}
+          inert={mobileViewport && !sidebarOpen}
         >
-          <SquarePen size={19} />새 대화
-          <Plus size={16} />
-        </button>
-        <div className="search-field">
-          <Search size={17} />
-          <input
-            aria-label="대화 검색"
-            placeholder="대화 검색"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <button className="sidebar-action review-inbox" onClick={() => openResults('all')}>
-          <ShieldCheck size={19} />
-          검증 답변
-          {totalUnread > 0 && (
-            <span
-              className="notification-badge"
-              aria-label={`읽지 않은 검증 답변 ${totalUnread}개`}
+          <div className="sidebar-brand">
+            <button
+              ref={sidebarLogo}
+              className="sidebar-logo"
+              aria-label={sidebarCollapsed ? '대화 메뉴 열기' : 'AI QAVER'}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="conversation-sidebar"
+              onClick={() => setSidebarCollapsed(false)}
             >
-              {totalUnread > 99 ? '99+' : totalUnread}
-            </span>
-          )}
-        </button>
-        <div className="history-label">
-          내 대화<span>{conversations.length}</span>
-        </div>
-        <nav className="history-list" aria-label="저장된 대화">
-          {!chatList.length && (
-            <p className="history-empty">
-              {search ? '검색 결과가 없어요.' : '첫 질문을 남겨보세요.\n대화가 이곳에 쌓입니다.'}
-            </p>
-          )}
-          {chatList.map((chat) => {
-            const results = reviews.filter((review) => review.sessionId === chat.id);
-            const unread = unreadCount(results);
-            return (
-              <div className={`history-row ${currentId === chat.id ? 'active' : ''}`} key={chat.id}>
-                <button
-                  className="history-title"
-                  title={chat.title}
-                  aria-current={currentId === chat.id ? 'page' : undefined}
-                  disabled={loading || switching}
-                  onClick={() => void openConversation(chat.id)}
+              <img className="brand-logo" src="/brand/aiqaver-logo.png" alt="AI QAVER" />
+              <img className="brand-symbol" src="/brand/aiqaver-symbol.png" alt="AI QAVER" />
+            </button>
+            <button
+              className="icon-button sidebar-toggle desktop-only"
+              aria-label="사이드바 접기"
+              title="사이드바 접기"
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="conversation-sidebar"
+              onClick={() => {
+                setSidebarCollapsed(true);
+                sidebarLogo.current?.focus();
+              }}
+            >
+              <PanelLeftClose size={20} />
+            </button>
+            <button
+              className="icon-button mobile-only"
+              aria-label="사이드바 닫기"
+              onClick={() => {
+                setSidebarOpen(false);
+                requestAnimationFrame(() => menuButton.current?.focus());
+              }}
+            >
+              <PanelLeftClose size={20} />
+            </button>
+          </div>
+          <button
+            className="sidebar-action new-chat"
+            aria-label="새로운 질문 시작하기"
+            title="새 대화"
+            disabled={loading || switching || !ready}
+            onClick={() => void newConversation()}
+          >
+            <SquarePen size={19} />
+            <span className="sidebar-text">새 대화</span>
+            <Plus size={16} className="new-chat-plus" />
+          </button>
+          <button
+            className="sidebar-action sidebar-search-toggle"
+            aria-label="대화 검색 열기"
+            title="대화 검색"
+            onClick={() => {
+              setSidebarCollapsed(false);
+              requestAnimationFrame(() => searchInput.current?.focus());
+            }}
+          >
+            <Search size={19} />
+          </button>
+          <div className="search-field">
+            <Search size={17} />
+            <input
+              ref={searchInput}
+              aria-label="대화 검색"
+              placeholder="대화 검색"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <button
+            className="sidebar-action review-inbox"
+            aria-label="검증 답변"
+            title="검증 답변"
+            onClick={() => openResults('all')}
+          >
+            <ShieldCheck size={19} />
+            <span className="sidebar-text">검증 답변</span>
+            {totalUnread > 0 && (
+              <span
+                className="notification-badge"
+                aria-label={`읽지 않은 검증 답변 ${totalUnread}개`}
+              >
+                {totalUnread > 99 ? '99+' : totalUnread}
+              </span>
+            )}
+          </button>
+          <div className="history-label">
+            내 대화<span>{conversations.length}</span>
+          </div>
+          <nav className="history-list" aria-label="저장된 대화">
+            {!chatList.length && (
+              <p className="history-empty">
+                {search ? '검색 결과가 없어요.' : '첫 질문을 남겨보세요.\n대화가 이곳에 쌓입니다.'}
+              </p>
+            )}
+            {chatList.map((chat) => {
+              const results = reviews.filter((review) => review.sessionId === chat.id);
+              const unread = unreadCount(results);
+              return (
+                <div
+                  className={`history-row ${currentId === chat.id ? 'active' : ''}`}
+                  key={chat.id}
                 >
-                  <MessageCircle size={16} />
-                  <span>{chat.title}</span>
-                </button>
-                {results.length > 0 && (
                   <button
-                    className={`review-notification ${unread ? 'notification-badge' : ''}`}
-                    aria-label={`${chat.title} 검증 결과${unread ? ` 새 답변 ${unread}개` : ' 보기'}`}
-                    onClick={() => openResults(chat.id)}
+                    className="history-title"
+                    title={chat.title}
+                    aria-current={currentId === chat.id ? 'page' : undefined}
+                    disabled={loading || switching}
+                    onClick={() => void openConversation(chat.id)}
                   >
-                    {unread ? unread > 99 ? '99+' : unread : <FileCheck2 size={16} />}
+                    <MessageCircle size={16} />
+                    <span>{chat.title}</span>
                   </button>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-        {(historyError || reviewError) && (
-          <button className="sidebar-retry" onClick={() => void refreshMetadata()}>
-            연결을 확인해 주세요 · 다시 시도
-          </button>
-        )}
-        <div className="sidebar-footer">
-          <button
-            onClick={() => {
-              setSidebarOpen(false);
-              setInfo('guide');
-            }}
-          >
-            <CircleHelp size={17} />
-            이용 방법
-          </button>
-          <button
-            onClick={() => {
-              setSidebarOpen(false);
-              setInfo('privacy');
-            }}
-          >
-            <ShieldCheck size={17} />
-            개인정보 안내
-          </button>
-          <small>같은 브라우저에서 이력이 유지됩니다.</small>
-        </div>
-      </aside>
-      <div className={`main-shell ${turns.length ? 'has-conversation' : 'workspace-empty'}`}>
+                  {results.length > 0 && (
+                    <button
+                      className={`review-notification ${unread ? 'notification-badge' : ''}`}
+                      aria-label={`${chat.title} 검증 결과${unread ? ` 새 답변 ${unread}개` : ' 보기'}`}
+                      onClick={() => openResults(chat.id)}
+                    >
+                      {unread ? unread > 99 ? '99+' : unread : <FileCheck2 size={16} />}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+          {(historyError || reviewError) && (
+            <button className="sidebar-retry" onClick={() => void refreshMetadata()}>
+              연결을 확인해 주세요 · 다시 시도
+            </button>
+          )}
+          <div className="sidebar-footer">
+            <button
+              aria-label="이용 방법"
+              title="이용 방법"
+              onClick={() => {
+                setSidebarOpen(false);
+                setInfo('guide');
+              }}
+            >
+              <CircleHelp size={17} />
+              <span className="sidebar-text">이용 방법</span>
+            </button>
+            <button
+              aria-label="개인정보 안내"
+              title="개인정보 안내"
+              onClick={() => {
+                setSidebarOpen(false);
+                setInfo('privacy');
+              }}
+            >
+              <ShieldCheck size={17} />
+              <span className="sidebar-text">개인정보 안내</span>
+            </button>
+            <small>같은 브라우저에서 이력이 유지됩니다.</small>
+          </div>
+        </aside>
+      </div>
+      <div
+        className={`main-shell ${turns.length ? 'has-conversation' : 'workspace-empty'}`}
+        inert={mobileViewport && sidebarOpen}
+      >
         <header className="topbar">
           <div>
             <button
@@ -666,15 +751,11 @@ export default function App() {
               className="icon-button mobile-only"
               aria-label="대화 메뉴 열기"
               aria-expanded={sidebarOpen}
+              aria-controls="conversation-sidebar"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu size={22} />
             </button>
-            <span className="workspace-title">
-              AI QAVER
-              <ChevronDown size={15} />
-            </span>
-            <span className="workspace-subtitle">질문에서 확신까지</span>
           </div>
           <div className="header-actions">
             <button
@@ -713,15 +794,16 @@ export default function App() {
             )}
             {!turns.length ? (
               <section className="hero">
-                <div className="hero-symbol">
-                  <img src="/brand/symbol.png" alt="" />
-                </div>
                 <h1>
                   법률이 궁금할 때,
                   <br />
-                  <span>무엇이든 물어보세요.</span>
+                  <span>AI에게 물어보세요.</span>
                 </h1>
-                <p>AI와 먼저 정리하고, 필요한 답변은 전문가에게 확인하세요.</p>
+                <p>
+                  <strong className="hero-verification">변호사가 검증해드립니다.</strong>
+                  법률 고민은 AI와 먼저 정리하고,
+                  <br /> 원하는 답변은 변호사에게 검증을 요청하세요.
+                </p>
               </section>
             ) : (
               <section className="conversation" aria-label="AI 대화" aria-live="polite">
@@ -738,7 +820,7 @@ export default function App() {
                       <div className="user-message">{turn.question}</div>
                       <div className="assistant-message">
                         <span className="assistant-avatar">
-                          <img src="/brand/symbol.png" alt="AI QAVER" />
+                          <img src="/brand/aiqaver-symbol.png" alt="AI QAVER" />
                         </span>
                         <div className="assistant-body">
                           <div className="assistant-name">
@@ -930,8 +1012,7 @@ export default function App() {
                     </div>
                     <p className="review-reply">{answer.reply}</p>
                     <small>
-                      {answer.reviewer.name} ·{' '}
-                      {new Date(answer.completedAt).toLocaleString('ko-KR')}
+                      {answer.expert.name} · {new Date(answer.completedAt).toLocaleString('ko-KR')}
                     </small>
                     <button
                       type="button"

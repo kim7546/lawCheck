@@ -42,7 +42,7 @@ export function communityRouter(
           id: true,
           question: true,
           createdAt: true,
-          contributions: { where: { reviewerId: user.id }, select: { status: true } },
+          contributions: { where: { expertId: user.id }, select: { status: true } },
         },
       }),
       db.communityPost.findMany({

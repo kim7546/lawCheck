@@ -6,13 +6,29 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import type { ChatStorage } from './chat-storage.js';
 import { ChatError } from './chat.js';
 import { communityRouter } from './community.js';
+import {
+  getOfficeSignupPolicy,
+  officeSignupPolicy,
+  validateOfficeSignup,
+} from './signup-policy.js';
+import { commonCodesRouter } from './common-codes.js';
+import { validateLawyerSignup } from './lawyer-signup.js';
 
 const derive = promisify(scrypt);
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-const COOKIE = 'qaver_reviewer';
+const COOKIE = 'qaver_expert';
 const TTL = 7 * 24 * 60 * 60 * 1000;
 const cookieOptions = { httpOnly: true, sameSite: 'strict' as const, path: '/api/v1/bo' };
-const publicAccount = { id: true, name: true, email: true, plan: true } as const;
+const publicAccount = {
+  id: true,
+  name: true,
+  email: true,
+  username: true,
+  plan: true,
+  expertGroup: true,
+  canManageCodes: true,
+  planCode: { select: { name: true } },
+} as const;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fail = (status: number, message: string) => new ChatError(status, 'REVIEW_ERROR', message);
 const tokenFrom = (req: Request) =>
@@ -38,7 +54,7 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
     const token = tokenFrom(req);
     const session =
       token && /^[a-f0-9]{64}$/.test(token)
-        ? await db.reviewerLoginSession.findUnique({
+        ? await db.expertLoginSession.findUnique({
             where: { tokenHash: hash(token) },
             include: { account: { select: publicAccount } },
           })
@@ -50,8 +66,8 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
     const token = randomBytes(32).toString('hex');
     const old = tokenFrom(req);
     await db.$transaction(async (tx) => {
-      if (old) await tx.reviewerLoginSession.deleteMany({ where: { tokenHash: hash(old) } });
-      await tx.reviewerLoginSession.create({
+      if (old) await tx.expertLoginSession.deleteMany({ where: { tokenHash: hash(old) } });
+      await tx.expertLoginSession.create({
         data: { accountId, tokenHash: hash(token), expiresAt: new Date(Date.now() + TTL) },
       });
     });
@@ -61,6 +77,9 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
       maxAge: TTL,
     });
   }
+  router.get('/bo/signup-policy', async (_req, res) => {
+    res.json({ success: true, data: await getOfficeSignupPolicy(db) });
+  });
   router.post(['/bo/signup', '/bo/login'], async (req, res) => {
     const now = Date.now();
     for (const [key, value] of attempts) if (value.expires <= now) attempts.delete(key);
@@ -69,45 +88,80 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
     attempts.set(key, limit);
     if (++limit.count > 15) throw fail(429, '요청이 많습니다. 1분 후 다시 시도해 주세요.');
     const { email, password, name } = req.body ?? {};
+    const signingUp = req.path === '/bo/signup';
+    const identifier = signingUp ? email : (req.body?.identifier ?? email);
     if (
-      typeof email !== 'string' ||
-      email.length > 254 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+      typeof identifier !== 'string' ||
+      !identifier.trim() ||
+      identifier.length > 254 ||
+      (signingUp && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) ||
       typeof password !== 'string' ||
       password.length < 10 ||
       password.length > 128
     )
-      throw fail(400, '이메일과 비밀번호(10~128자)를 확인해 주세요.');
-    const normalized = email.trim().toLowerCase();
-    if (req.path === '/bo/signup') {
+      throw fail(400, '아이디 또는 이메일과 비밀번호(10~128자)를 확인해 주세요.');
+    const normalized = identifier.trim().toLowerCase();
+    if (signingUp) {
       if (typeof name !== 'string' || !name.trim() || name.trim().length > 100)
         throw fail(400, '이름을 1~100자로 입력해 주세요.');
+      const lawyer = validateLawyerSignup(req.body);
       const salt = randomBytes(16).toString('hex');
       const passwordHash = `${salt}:${((await derive(password, salt, 64)) as Buffer).toString('hex')}`;
       try {
-        const user = await db.$transaction((tx) =>
-          tx.reviewerAccount.create({
-            data: { email: normalized, name: name.trim(), passwordHash },
+        const user = await db.$transaction(async (tx) => {
+          const expertGroup = validateOfficeSignup(
+            await getOfficeSignupPolicy(tx),
+            req.body?.expertGroup,
+            req.body?.consents,
+          );
+          const free = await tx.commonCodeDetail.findUnique({
+            where: { groupCode_code: { groupCode: 'PLAN', code: 'FREE' } },
+            include: { group: true },
+          });
+          if (!free?.isActive || !free.group.isActive)
+            throw fail(503, '현재 신규 가입이 중단되어 있습니다.');
+          return tx.expertAccount.create({
+            data: {
+              email: normalized,
+              name: name.trim(),
+              passwordHash,
+              expertGroup,
+              username: lawyer.username,
+              betaSignupCode: lawyer.betaSignupCode,
+              lawyerProfile: { create: lawyer.profile },
+              consents: {
+                create: officeSignupPolicy.agreements.map((document) => ({
+                  kind: document.kind,
+                  version: document.version,
+                  document: { title: document.title, paragraphs: document.paragraphs },
+                })),
+              },
+            },
             select: publicAccount,
-          }),
-        );
+          });
+        });
         await login(req, res, user.id);
         res.status(201).json({ success: true, data: user });
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
-          throw fail(409, '이미 가입된 이메일입니다.');
+          throw fail(409, '이미 사용 중인 아이디 또는 이메일입니다.');
         throw error;
       }
     } else {
-      const user = await db.reviewerAccount.findUnique({ where: { email: normalized } });
+      const user = await db.expertAccount.findUnique({
+        where: normalized.includes('@') ? { email: normalized } : { username: normalized },
+      });
       const [salt, expected] = user?.passwordHash.split(':') ?? ['0'.repeat(32), '0'.repeat(128)];
       const actual = (await derive(password, salt!, 64)) as Buffer;
       if (!user || !expected || !timingSafeEqual(actual, Buffer.from(expected, 'hex')))
-        throw fail(401, '이메일 또는 비밀번호가 올바르지 않습니다.');
+        throw fail(401, '아이디 또는 이메일과 비밀번호가 올바르지 않습니다.');
       await login(req, res, user.id);
       res.json({
         success: true,
-        data: { id: user.id, name: user.name, email: user.email, plan: user.plan },
+        data: await db.expertAccount.findUniqueOrThrow({
+          where: { id: user.id },
+          select: publicAccount,
+        }),
       });
     }
   });
@@ -116,10 +170,11 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
   });
   router.post('/bo/logout', async (req, res) => {
     const token = tokenFrom(req);
-    if (token) await db.reviewerLoginSession.deleteMany({ where: { tokenHash: hash(token) } });
+    if (token) await db.expertLoginSession.deleteMany({ where: { tokenHash: hash(token) } });
     res.clearCookie(COOKIE, cookieOptions).json({ success: true });
   });
   router.use(communityRouter(db, account));
+  router.use(commonCodesRouter(db, account));
   router.get('/bo/reviews', async (req, res) => {
     const user = await account(req);
     const page = Number(req.query.page ?? 1);
@@ -133,9 +188,9 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
       throw fail(400, '조회 조건을 확인해 주세요.');
     const where: Prisma.ReviewBoardPostWhereInput =
       status === 'REQUESTED'
-        ? { contributions: { none: { reviewerId: user.id } } }
+        ? { contributions: { none: { expertId: user.id } } }
         : status
-          ? { contributions: { some: { reviewerId: user.id, status } } }
+          ? { contributions: { some: { expertId: user.id, status } } }
           : {};
     const [items, total] = await Promise.all([
       db.reviewBoardPost.findMany({
@@ -147,7 +202,7 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
           id: true,
           question: true,
           createdAt: true,
-          contributions: { where: { reviewerId: user.id }, select: { status: true } },
+          contributions: { where: { expertId: user.id }, select: { status: true } },
         },
       }),
       db.reviewBoardPost.count({ where }),
@@ -175,7 +230,7 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
         aiAnswer: true,
         createdAt: true,
         contributions: {
-          where: { reviewerId: user.id },
+          where: { expertId: user.id },
           select: { status: true, reply: true, completedAt: true },
         },
       },
@@ -209,11 +264,11 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
     const changed =
       action === 'claim'
         ? await db.reviewContribution.createMany({
-            data: { postId: id, reviewerId: user.id },
+            data: { postId: id, expertId: user.id },
             skipDuplicates: true,
           })
         : await db.reviewContribution.updateMany({
-            where: { postId: id, reviewerId: user.id, status: 'REVIEWING' },
+            where: { postId: id, expertId: user.id, status: 'REVIEWING' },
             data: { status: 'COMPLETED', reply: reply.trim(), completedAt: new Date() },
           });
     if (!changed.count)
@@ -277,7 +332,7 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
             id: true,
             reply: true,
             completedAt: true,
-            reviewer: { select: { name: true } },
+            expert: { select: { name: true } },
             reads: { where: { browserId }, select: { readAt: true } },
           },
         },

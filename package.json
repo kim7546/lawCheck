@@ -20,6 +20,7 @@
     "test": "npm run test -w @lawcheck/api",
     "test:e2e": "playwright test",
     "db:generate": "npm run db:generate -w @lawcheck/api",
+    "codes:admin": "node apps/api/prisma/code-admin.mjs",
     "db:migrate": "npm run db:migrate -w @lawcheck/api",
     "db:migrate:dev": "npm run db:migrate:dev -w @lawcheck/api --",
     "db:seed": "npm run db:seed -w @lawcheck/api",

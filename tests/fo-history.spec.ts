@@ -29,7 +29,7 @@ test('sidebar keeps conversations and unread badges open review modals', async (
       id: string;
       reply: string;
       unread: boolean;
-      reviewer: { name: string };
+      expert: { name: string };
       completedAt: string;
     }[],
   };
@@ -108,7 +108,7 @@ test('sidebar keeps conversations and unread badges open review modals', async (
       id: `review-answer-${index}`,
       reply,
       unread: true,
-      reviewer: { name: `답변자 ${index + 1}` },
+      expert: { name: `답변자 ${index + 1}` },
       completedAt: new Date().toISOString(),
     })),
   );
@@ -133,7 +133,7 @@ test('sidebar keeps conversations and unread badges open review modals', async (
     id: 'late-answer',
     reply: '새롭게 도착한 검증 답변',
     unread: true,
-    reviewer: { name: '답변자 3' },
+    expert: { name: '답변자 3' },
     completedAt: new Date().toISOString(),
   });
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));

@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { officeSignupPolicy } from './office-policy.fixture';
 
-test('reviewer signs up, claims a request and submits a verification answer', async ({
+test('expert signs up, claims a request and submits a verification answer', async ({
   page,
 }, testInfo) => {
   let authenticated = false;
-  const user = { id: 'reviewer-1', name: '답변자', email: 'review@example.com' };
+  const user = { id: 'expert-1', name: '답변자', email: 'review@example.com' };
   const post = {
     id: 'post-1',
     question: '보증금을 돌려받으려면 어떻게 하나요?',
@@ -17,11 +18,20 @@ test('reviewer signs up, claims a request and submits a verification answer', as
   await page.route('**/api/v1/bo/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown;
-    if (path.endsWith('/me')) {
+    if (path.endsWith('/signup-policy')) data = officeSignupPolicy;
+    else if (path.endsWith('/me')) {
       if (!authenticated)
         return route.fulfill({ status: 401, json: { error: { message: '로그인이 필요합니다.' } } });
       data = user;
     } else if (path.endsWith('/signup')) {
+      expect(route.request().postDataJSON().expertGroup).toBe('LAWYER');
+      expect(route.request().postDataJSON().consents).toEqual(
+        officeSignupPolicy.agreements.map(({ kind, version }) => ({
+          kind,
+          version,
+          accepted: true,
+        })),
+      );
       authenticated = true;
       data = user;
     } else if (path.endsWith('/dashboard')) {
@@ -42,6 +52,17 @@ test('reviewer signs up, claims a request and submits a verification answer', as
   await page.getByLabel('이름', { exact: true }).fill(user.name);
   await page.getByLabel('이메일', { exact: true }).fill(user.email);
   await page.getByLabel('비밀번호', { exact: true }).fill('test-password-123');
+  await page.getByLabel('아이디', { exact: true }).fill('expert_test');
+  await page.getByLabel('비밀번호 확인', { exact: true }).fill('test-password-123');
+  await page.getByLabel('휴대전화', { exact: true }).fill('010-1234-5678');
+  await page.getByLabel('변호사 등록 번호', { exact: true }).fill('001234');
+  await page.getByLabel('발급번호', { exact: true }).fill('ISSUE-001');
+  await page.getByLabel('소속 법무법인/사무소명', { exact: true }).fill('테스트 법률사무소');
+  await page.getByLabel('주소', { exact: true }).fill('서울특별시 테스트로 1');
+  await page.getByLabel('대표전화', { exact: true }).fill('02-1234-5678');
+  await page.getByRole('radio', { name: '변호사', exact: true }).check();
+  await page.getByRole('checkbox', { name: '모두 동의', exact: true }).check();
+  await page.getByLabel('클로즈 베타 가입코드', { exact: true }).fill('1004');
   await page.getByRole('button', { name: '가입하고 시작하기' }).click();
   await expect(page.getByRole('heading', { name: '대시보드' })).toBeVisible();
   await page.getByRole('button', { name: '검증요청 게시판', exact: true }).click();
@@ -84,13 +105,13 @@ test('requester compares multiple answers and keeps exactly one selection after 
       {
         id: 'answer-a',
         reply: '첫 번째 검증 의견입니다.',
-        reviewer: { name: '답변자 A' },
+        expert: { name: '답변자 A' },
         completedAt: new Date().toISOString(),
       },
       {
         id: 'answer-b',
         reply: '두 번째 검증 의견입니다.',
-        reviewer: { name: '답변자 B' },
+        expert: { name: '답변자 B' },
         completedAt: new Date().toISOString(),
       },
     ],

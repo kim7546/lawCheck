@@ -5,8 +5,19 @@ import './styles.css';
 import { api, ApiError } from './api';
 import { Dashboard, Community } from './community';
 import { BoardDetail } from './BoardDetail';
+import { SignupFields } from './SignupFields';
+import { CommonCodes } from './CommonCodes';
+import { LawyerSignupFields } from './LawyerSignupFields';
+import type { OfficeSignupConsent } from '@lawcheck/contracts';
 
-type User = { id: string; name: string; email: string; plan: 'FREE' | 'PRO' | 'BUSINESS' };
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  plan: string;
+  planCode?: { name: string };
+  canManageCodes?: boolean;
+};
 type Post = {
   id: string;
   question: string;
@@ -24,11 +35,14 @@ const labels: Record<string, string> = {
 };
 const date = (value: string) => new Date(value).toLocaleString('ko-KR');
 function App() {
-  const [section, setSection] = useState<'dashboard' | 'reviews' | 'community'>('dashboard');
+  const [section, setSection] = useState<'dashboard' | 'reviews' | 'community' | 'codes'>(
+    'dashboard',
+  );
   const [communityId, setCommunityId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [signup, setSignup] = useState(false);
+  const [signupConsent, setSignupConsent] = useState<OfficeSignupConsent | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [board, setBoard] = useState<Board>({ items: [], total: 0, page: 1 });
@@ -121,14 +135,11 @@ function App() {
     <div className="shell">
       <header className="topbar">
         <a href="/" aria-label="대시보드 홈">
-          <img src="/brand/logo.png" alt="aiqaver.com" />
+          <img src="/brand/aiqaver-office.png" alt="AI QAVER Office" />
         </a>
-        <span className="workspace-label">답변자 공간</span>
         {user && (
           <div className="account">
-            <span className="badge plan-badge">
-              {({ FREE: 'Free', PRO: 'Pro', BUSINESS: 'Business' } as const)[user.plan] ?? 'Free'}
-            </span>
+            <span className="badge plan-badge">{user.planCode?.name ?? user.plan}</span>
             <span>{user.name} 님</span>
             <button
               disabled={busy}
@@ -160,7 +171,7 @@ function App() {
           <p role="status">로그인 정보를 확인하고 있습니다.</p>
         </main>
       ) : !user ? (
-        <main className="auth-layout">
+        <main className={`auth-layout ${signup ? 'signup-layout' : ''}`}>
           <section className="intro">
             <span className="eyebrow">AI QAVER REVIEW</span>
             <h1>
@@ -179,20 +190,46 @@ function App() {
           </section>
           <section className="auth-card">
             <h2>{signup ? '회원가입' : '로그인'}</h2>
-            <p>{signup ? '검증 답변자로 참여해 주세요.' : '로그인 후 검증 요청을 확인하세요.'}</p>
+            <p>
+              {signup
+                ? '변호사 Office의 검증과 커뮤니티에 참여해 주세요.'
+                : '로그인 후 검증 요청을 확인하세요.'}
+            </p>
             <form
+              onInput={() => setError('')}
               onSubmit={async (event) => {
                 event.preventDefault();
                 if (busy) return;
+                if (signup && !signupConsent) return;
                 const form = new FormData(event.currentTarget);
+                if (signup && form.get('password') !== form.get('passwordConfirmation')) {
+                  setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+                  return;
+                }
                 setBusy(true);
                 setError('');
                 try {
                   setUser(
                     await api<User>(signup ? '/signup' : '/login', {
-                      email: form.get('email'),
                       password: form.get('password'),
-                      name: form.get('name'),
+                      ...(signup
+                        ? {
+                            ...signupConsent,
+                            name: form.get('name'),
+                            username: form.get('username'),
+                            betaSignupCode: form.get('betaSignupCode'),
+                            email: form.get('email'),
+                            passwordConfirmation: form.get('passwordConfirmation'),
+                            lawyerProfile: {
+                              mobilePhone: form.get('mobilePhone'),
+                              registrationNumber: form.get('registrationNumber'),
+                              issueNumber: form.get('issueNumber'),
+                              officeName: form.get('officeName'),
+                              address: form.get('address'),
+                              officePhone: form.get('officePhone'),
+                            },
+                          }
+                        : { identifier: form.get('identifier') }),
                     }),
                   );
                 } catch (e) {
@@ -202,35 +239,36 @@ function App() {
                 }
               }}
             >
-              {signup && (
-                <label>
-                  이름
-                  <input name="name" autoComplete="name" maxLength={100} required />
-                </label>
+              {signup ? (
+                <LawyerSignupFields busy={busy} />
+              ) : (
+                <>
+                  <label>
+                    아이디 또는 이메일
+                    <input name="identifier" autoComplete="username" maxLength={254} required />
+                  </label>
+                  <label>
+                    비밀번호
+                    <input
+                      key={String(signup)}
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      minLength={10}
+                      maxLength={128}
+                      required
+                      placeholder="10자 이상 입력"
+                    />
+                  </label>
+                </>
               )}
-              <label>
-                이메일
-                <input name="email" type="email" autoComplete="username" maxLength={254} required />
-              </label>
-              <label>
-                비밀번호
-                <input
-                  key={String(signup)}
-                  name="password"
-                  type="password"
-                  autoComplete={signup ? 'new-password' : 'current-password'}
-                  minLength={10}
-                  maxLength={128}
-                  required
-                  placeholder="10자 이상 입력"
-                />
-              </label>
+              {signup && <SignupFields busy={busy} onChange={setSignupConsent} />}
               {error && (
                 <p role="alert" className="error">
                   {error}
                 </p>
               )}
-              <button className="primary" disabled={busy}>
+              <button className="primary" disabled={busy || (signup && !signupConsent)}>
                 {busy ? '처리 중…' : signup ? '가입하고 시작하기' : '로그인'}
                 <ArrowRight size={17} />
               </button>
@@ -240,6 +278,7 @@ function App() {
               disabled={busy}
               onClick={() => {
                 setSignup(!signup);
+                setSignupConsent(null);
                 setError('');
               }}
             >
@@ -273,6 +312,19 @@ function App() {
                 {label}
               </button>
             ))}
+            {user.canManageCodes && (
+              <button
+                aria-current={section === 'codes' ? 'page' : undefined}
+                disabled={busy}
+                onClick={() => {
+                  setSection('codes');
+                  setError('');
+                  setNotice('');
+                }}
+              >
+                공통 코드 관리
+              </button>
+            )}
           </nav>
           {error && (
             <p role="alert" className="error">
@@ -284,7 +336,9 @@ function App() {
               {notice}
             </p>
           )}
-          {section === 'dashboard' ? (
+          {section === 'codes' && user.canManageCodes ? (
+            <CommonCodes onError={showError} />
+          ) : section === 'dashboard' ? (
             <Dashboard
               onError={showError}
               onClearError={() => setError('')}
