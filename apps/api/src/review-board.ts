@@ -5,13 +5,14 @@ import type { Request, Response } from 'express';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import type { ChatStorage } from './chat-storage.js';
 import { ChatError } from './chat.js';
+import { communityRouter } from './community.js';
 
 const derive = promisify(scrypt);
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const COOKIE = 'qaver_reviewer';
 const TTL = 7 * 24 * 60 * 60 * 1000;
 const cookieOptions = { httpOnly: true, sameSite: 'strict' as const, path: '/api/v1/bo' };
-const publicAccount = { id: true, name: true, email: true } as const;
+const publicAccount = { id: true, name: true, email: true, plan: true } as const;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fail = (status: number, message: string) => new ChatError(status, 'REVIEW_ERROR', message);
 const tokenFrom = (req: Request) =>
@@ -104,7 +105,10 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
       if (!user || !expected || !timingSafeEqual(actual, Buffer.from(expected, 'hex')))
         throw fail(401, '이메일 또는 비밀번호가 올바르지 않습니다.');
       await login(req, res, user.id);
-      res.json({ success: true, data: { id: user.id, name: user.name, email: user.email } });
+      res.json({
+        success: true,
+        data: { id: user.id, name: user.name, email: user.email, plan: user.plan },
+      });
     }
   });
   router.get('/bo/me', async (req, res) => {
@@ -115,6 +119,7 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
     if (token) await db.reviewerLoginSession.deleteMany({ where: { tokenHash: hash(token) } });
     res.clearCookie(COOKIE, cookieOptions).json({ success: true });
   });
+  router.use(communityRouter(db, account));
   router.get('/bo/reviews', async (req, res) => {
     const user = await account(req);
     const page = Number(req.query.page ?? 1);

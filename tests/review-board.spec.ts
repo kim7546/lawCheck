@@ -24,6 +24,8 @@ test('reviewer signs up, claims a request and submits a verification answer', as
     } else if (path.endsWith('/signup')) {
       authenticated = true;
       data = user;
+    } else if (path.endsWith('/dashboard')) {
+      data = { reviewCount: 1, communityCount: 0, reviews: [post], bestPosts: [] };
     } else if (path.endsWith('/claim')) {
       post.status = 'REVIEWING';
     } else if (path.endsWith('/complete')) {
@@ -41,6 +43,8 @@ test('reviewer signs up, claims a request and submits a verification answer', as
   await page.getByLabel('이메일', { exact: true }).fill(user.email);
   await page.getByLabel('비밀번호', { exact: true }).fill('test-password-123');
   await page.getByRole('button', { name: '가입하고 시작하기' }).click();
+  await expect(page.getByRole('heading', { name: '대시보드' })).toBeVisible();
+  await page.getByRole('button', { name: '검증요청 게시판', exact: true }).click();
   await expect(page.getByRole('heading', { name: '검증 요청 게시판' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('board.png'), fullPage: true });
   await page.getByRole('button', { name: /보증금을 돌려받으려면/ }).click();
@@ -62,6 +66,8 @@ test('reviewer signs up, claims a request and submits a verification answer', as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('completed.png'), fullPage: true });
   await page.reload();
+  await expect(page.getByRole('heading', { name: '대시보드' })).toBeVisible();
+  await page.getByRole('button', { name: '검증요청 게시판', exact: true }).click();
   await expect(page.getByRole('heading', { name: '검증 요청 게시판' })).toBeVisible();
   await page.getByRole('button', { name: '로그아웃' }).click();
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();

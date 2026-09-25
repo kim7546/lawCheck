@@ -2,8 +2,11 @@
 import ReactDOM from 'react-dom/client';
 import { ArrowLeft, ArrowRight, CheckCheck, ClipboardCheck, LogOut, RefreshCw } from 'lucide-react';
 import './styles.css';
+import { api, ApiError } from './api';
+import { Dashboard, Community } from './community';
+import { BoardDetail } from './BoardDetail';
 
-type User = { id: string; name: string; email: string };
+type User = { id: string; name: string; email: string; plan: 'FREE' | 'PRO' | 'BUSINESS' };
 type Post = {
   id: string;
   question: string;
@@ -19,32 +22,10 @@ const labels: Record<string, string> = {
   REVIEWING: '검증 중',
   COMPLETED: '검증완료',
 };
-class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-  ) {
-    super(message);
-  }
-}
-async function api<T>(path: string, body?: object): Promise<T> {
-  const response = await fetch(`/api/v1/bo${path}`, {
-    credentials: 'same-origin',
-    ...(body
-      ? {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }
-      : {}),
-  });
-  const result = await response.json();
-  if (!response.ok)
-    throw new ApiError(result.error?.message ?? '요청을 처리하지 못했습니다.', response.status);
-  return result.data;
-}
 const date = (value: string) => new Date(value).toLocaleString('ko-KR');
 function App() {
+  const [section, setSection] = useState<'dashboard' | 'reviews' | 'community'>('dashboard');
+  const [communityId, setCommunityId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [signup, setSignup] = useState(false);
@@ -67,6 +48,8 @@ function App() {
   function showError(e: unknown) {
     if (e instanceof ApiError && e.status === 401) {
       setUser(null);
+      setSection('dashboard');
+      setCommunityId(null);
       setPost(null);
     }
     setError(e instanceof Error ? e.message : '서버에 연결하지 못했습니다.');
@@ -84,7 +67,7 @@ function App() {
     }
   }
   useEffect(() => {
-    if (!user) return;
+    if (!user || section !== 'reviews') return;
     let active = true;
     setBusy(true);
     api<Board>('/reviews')
@@ -100,7 +83,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user, section]);
   async function openPost(id: string) {
     setBusy(true);
     setError('');
@@ -137,12 +120,15 @@ function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <a href="/" aria-label="검증 게시판 홈">
+        <a href="/" aria-label="대시보드 홈">
           <img src="/brand/logo.png" alt="aiqaver.com" />
         </a>
         <span className="workspace-label">답변자 공간</span>
         {user && (
           <div className="account">
+            <span className="badge plan-badge">
+              {({ FREE: 'Free', PRO: 'Pro', BUSINESS: 'Business' } as const)[user.plan] ?? 'Free'}
+            </span>
             <span>{user.name} 님</span>
             <button
               disabled={busy}
@@ -151,6 +137,8 @@ function App() {
                 try {
                   await api('/logout', {});
                   setUser(null);
+                  setSection('dashboard');
+                  setCommunityId(null);
                   setPost(null);
                   setStatus('');
                   setError('');
@@ -261,6 +249,31 @@ function App() {
         </main>
       ) : (
         <main className="board-main">
+          <nav className="main-nav" aria-label="주 메뉴">
+            {(
+              [
+                ['dashboard', '대시보드'],
+                ['reviews', '검증요청 게시판'],
+                ['community', '커뮤니티'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                aria-current={section === key ? 'page' : undefined}
+                disabled={busy}
+                onClick={() => {
+                  setSection(key);
+                  setStatus('');
+                  setPost(null);
+                  setCommunityId(null);
+                  setError('');
+                  setNotice('');
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
           {error && (
             <p role="alert" className="error">
               {error}
@@ -271,8 +284,39 @@ function App() {
               {notice}
             </p>
           )}
-          {post ? (
-            <>
+          {section === 'dashboard' ? (
+            <Dashboard
+              onError={showError}
+              onClearError={() => setError('')}
+              onReview={(id) => {
+                setSection('reviews');
+                void openPost(id);
+              }}
+              onCommunity={(id) => {
+                setCommunityId(id);
+                setSection('community');
+              }}
+              onNavigate={(next) => {
+                setSection(next);
+                setPost(null);
+                setCommunityId(null);
+              }}
+            />
+          ) : section === 'community' ? (
+            <Community
+              key={user.id}
+              initialId={communityId}
+              onError={showError}
+              onClearError={() => setError('')}
+            />
+          ) : post ? (
+            <BoardDetail
+              busy={busy}
+              onBack={() => {
+                setNotice('');
+                void loadBoard(board.page);
+              }}
+            >
               <button
                 className="back"
                 disabled={busy}
@@ -351,7 +395,7 @@ function App() {
                   </>
                 )}
               </section>
-            </>
+            </BoardDetail>
           ) : (
             <>
               <div className="board-heading">

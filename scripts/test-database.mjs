@@ -34,7 +34,7 @@ try {
   const tables = await db.query(
     "SELECT count(*)::int AS count FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'",
   );
-  assert.equal(tables.rows[0].count, 24);
+  assert.equal(tables.rows[0].count, 26);
   assert.deepEqual(
     (await db.query('SELECT status, reply FROM review_contributions ORDER BY post_id')).rows,
     [
@@ -50,7 +50,7 @@ try {
     await readFile(new URL('../apps/api/prisma/tests/integrity.sql', import.meta.url), 'utf8'),
   );
   console.log(
-    'Database integrity and legacy review migration tests passed (isolated PostgreSQL/PGlite, 24 tables).',
+    'Database integrity and legacy review migration tests passed (isolated PostgreSQL/PGlite, 26 tables).',
   );
 } finally {
   await db.close();

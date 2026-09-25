@@ -373,8 +373,118 @@ test(
         1,
       );
       await reviewer.get('/api/v1/bo/reviews?page=-1').expect(400);
+      // Free community persists across clients and uses server-owned authorship.
+      assert.equal((await reviewer.get('/api/v1/bo/me')).body.data.plan, 'FREE');
+      await request(reviewApp).get('/api/v1/bo/dashboard').expect(401);
+      await request(reviewApp).get('/api/v1/bo/community').expect(401);
+      await request(reviewApp)
+        .post('/api/v1/bo/community')
+        .send({ title: 'x', content: 'y' })
+        .expect(401);
+      await reviewer.post('/api/v1/bo/community').send({ title: ' ', content: 'body' }).expect(400);
+      await reviewer
+        .post('/api/v1/bo/community')
+        .send({ title: 'x'.repeat(201), content: 'body' })
+        .expect(400);
+      await reviewer
+        .post('/api/v1/bo/community')
+        .send({ title: 'valid', content: 'x'.repeat(20001) })
+        .expect(400);
+      await reviewer
+        .post('/api/v1/bo/community')
+        .set('Sec-Fetch-Site', 'cross-site')
+        .send({ title: 'x', content: 'y' })
+        .expect(403);
+      const community = await reviewer
+        .post('/api/v1/bo/community')
+        .send({ title: ' Community title ', content: ' Persistent content ', authorId: 'forged' })
+        .expect(201);
+      const communityId = community.body.data.id;
+      const shared = await otherReviewer.get(`/api/v1/bo/community/${communityId}`).expect(200);
+      assert.equal(shared.body.data.title, 'Community title');
+      assert.equal(shared.body.data.author.id, signup.body.data.id);
+      assert.equal(shared.body.data.content, 'Persistent content');
+      assert.equal(shared.body.data.author.email, undefined);
+      await reviewer.get('/api/v1/bo/community?page=0').expect(400);
+      await reviewer.get('/api/v1/bo/community/invalid').expect(404);
+      await reviewer.get(`/api/v1/bo/community/${communityId}?page=1.5`).expect(400);
+      await request(reviewApp)
+        .post(`/api/v1/bo/community/${communityId}/replies`)
+        .send({ content: 'reply' })
+        .expect(401);
+      await reviewer
+        .post(`/api/v1/bo/community/${communityId}/replies`)
+        .send({ content: ' ' })
+        .expect(400);
+      await reviewer
+        .post(`/api/v1/bo/community/${communityId}/replies`)
+        .send({ content: 'x'.repeat(5001) })
+        .expect(400);
+      await reviewer
+        .post('/api/v1/bo/community/00000000-0000-4000-8000-000000000000/replies')
+        .send({ content: 'reply' })
+        .expect(404);
+      await otherReviewer
+        .post(`/api/v1/bo/community/${communityId}/replies`)
+        .send({ content: ' Reply from another user ', authorId: signup.body.data.id })
+        .expect(201);
+      const replied = (await reviewer.get(`/api/v1/bo/community/${communityId}`).expect(200)).body
+        .data;
+      assert.equal(replied.replies[0].content, 'Reply from another user');
+      assert.notEqual(replied.replies[0].author.id, signup.body.data.id);
+      assert.equal(replied._count.replies, 1);
+      await db.communityReply.createMany({
+        data: Array.from({ length: 20 }, (_, i) => ({
+          postId: communityId,
+          authorId: signup.body.data.id,
+          content: `reply ${i}`,
+        })),
+      });
+      assert.equal(
+        (await reviewer.get(`/api/v1/bo/community/${communityId}`)).body.data.replies.length,
+        20,
+      );
+      assert.equal(
+        (await reviewer.get(`/api/v1/bo/community/${communityId}?page=2`)).body.data.replies.length,
+        1,
+      );
+      await db.communityPost.createMany({
+        data: Array.from({ length: 21 }, (_, i) => ({
+          authorId: signup.body.data.id,
+          title: `post ${i}`,
+          content: 'body',
+          createdAt: new Date(Date.now() + i * 1000),
+        })),
+      });
+      assert.equal((await reviewer.get('/api/v1/bo/community')).body.data.items.length, 20);
+      assert.equal((await reviewer.get('/api/v1/bo/community?page=2')).body.data.items.length, 2);
+      await db.reviewBoardPost.createMany({
+        data: Array.from({ length: 6 }, (_, i) => ({
+          sessionId: originalChatId,
+          answerMessageId: `00000000-0000-4000-8000-00000000000${i}`,
+          question: `latest ${i}`,
+          aiAnswer: 'answer',
+          requesterEmail: 'private@example.com',
+          createdAt: new Date(Date.now() + i * 1000),
+        })),
+      });
+      const dashboard = (await reviewer.get('/api/v1/bo/dashboard').expect(200)).body.data;
+      assert.equal(dashboard.reviews.length, 5);
+      assert.deepEqual(
+        dashboard.reviews.map((item: { question: string }) => item.question),
+        ['latest 5', 'latest 4', 'latest 3', 'latest 2', 'latest 1'],
+      );
+      assert.equal(dashboard.bestPosts.length, 5);
+      assert.equal(dashboard.bestPosts[0].id, communityId);
+      assert.equal(dashboard.bestPosts[1].title, 'post 20');
+      assert.equal(dashboard.reviews[0].requesterEmail, undefined);
       await db.reviewerLoginSession.updateMany({ data: { expiresAt: new Date(0) } });
       await reviewer.get('/api/v1/bo/me').expect(401);
+      await reviewer.get('/api/v1/bo/dashboard').expect(401);
+      await reviewer
+        .post(`/api/v1/bo/community/${communityId}/replies`)
+        .send({ content: 'expired' })
+        .expect(401);
     } finally {
       await db?.$disconnect();
       await socket.stop();

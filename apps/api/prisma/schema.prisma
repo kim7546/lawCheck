@@ -7,7 +7,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ReviewerPlan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+model CommunityPost {
+  id String @id @default(uuid()) @db.Uuid
+  authorId String @map("author_id") @db.Uuid
+  title String @db.VarChar(200)
+  content String @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  author ReviewerAccount @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  replies CommunityReply[]
+  @@index([createdAt, id])
+  @@map("community_posts")
+}
+
+model CommunityReply {
+  id String @id @default(uuid()) @db.Uuid
+  postId String @map("post_id") @db.Uuid
+  authorId String @map("author_id") @db.Uuid
+  content String @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author ReviewerAccount @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  @@index([postId, createdAt, id])
+  @@map("community_replies")
+}
+
 model ReviewerAccount {
+  plan ReviewerPlan @default(FREE)
+  communityPosts CommunityPost[]
+  communityReplies CommunityReply[]
   id String @id @default(uuid()) @db.Uuid
   email String @unique @db.VarChar(254)
   name String @db.VarChar(100)
