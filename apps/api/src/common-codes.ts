@@ -41,20 +41,21 @@ function version(value: unknown) {
 export function commonCodesRouter(
   db: PrismaClient,
   account: (req: Request) => Promise<{ canManageCodes: boolean }>,
+  base = '/bo/code-groups',
 ) {
   const router = Router();
-  router.use('/bo/code-groups', async (req, _res, next) => {
+  router.use(base, async (req, _res, next) => {
     const user = await account(req);
     if (!user.canManageCodes) throw fail(403, '공통 코드 관리 권한이 필요합니다.');
     next();
   });
-  router.get('/bo/code-groups', async (_req, res) => {
+  router.get(base, async (_req, res) => {
     res.json({
       success: true,
       data: await db.commonCodeGroup.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] }),
     });
   });
-  router.post('/bo/code-groups', async (req, res) => {
+  router.post(base, async (req, res) => {
     res.status(201).json({
       success: true,
       data: await db.$transaction((tx) =>
@@ -64,7 +65,7 @@ export function commonCodesRouter(
       ),
     });
   });
-  router.post('/bo/code-groups/:group', async (req, res) => {
+  router.post(`${base}/:group`, async (req, res) => {
     const group = code(req.params.group);
     if (req.body?.code !== undefined && req.body.code !== group)
       throw fail(400, '기존 코드 값은 변경할 수 없습니다.');
@@ -83,7 +84,7 @@ export function commonCodesRouter(
       data: await db.commonCodeGroup.findUniqueOrThrow({ where: { code: group } }),
     });
   });
-  router.get('/bo/code-groups/:group/details', async (req, res) => {
+  router.get(`${base}/:group/details`, async (req, res) => {
     const group = code(req.params.group);
     if (!(await db.commonCodeGroup.findUnique({ where: { code: group }, select: { code: true } })))
       throw fail(404, '그룹을 찾을 수 없습니다.');
@@ -95,7 +96,7 @@ export function commonCodesRouter(
       }),
     });
   });
-  router.post('/bo/code-groups/:group/details', async (req, res) => {
+  router.post(`${base}/:group/details`, async (req, res) => {
     res.status(201).json({
       success: true,
       data: await db.$transaction((tx) =>
@@ -109,7 +110,7 @@ export function commonCodesRouter(
       ),
     });
   });
-  router.post('/bo/code-groups/:group/details/:detail', async (req, res) => {
+  router.post(`${base}/:group/details/:detail`, async (req, res) => {
     const groupCode = code(req.params.group);
     const detailCode = code(req.params.detail);
     if (

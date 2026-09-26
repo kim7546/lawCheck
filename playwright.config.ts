@@ -23,10 +23,15 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://127.0.0.1:5173',
+  webServer: [
+    { name: 'api', url: 'http://127.0.0.1:4000/api/v1/health' },
+    { name: 'fo', url: 'http://127.0.0.1:5173' },
+    { name: 'bo', url: 'http://127.0.0.1:5174' },
+    { name: 'admin', url: 'http://127.0.0.1:5175/admin' },
+  ].map(({ name, url }) => ({
+    command: `npm run dev -w @lawcheck/${name}`,
+    url,
     reuseExistingServer: !process.env.CI,
     timeout: 60000,
-  },
+  })),
 });

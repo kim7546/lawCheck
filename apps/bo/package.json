@@ -10,6 +10,8 @@
     "preview": "vite preview --config vite.preview.config.ts"
   },
   "dependencies": {
+    "@lawcheck/contracts": "*",
+    "@lawcheck/ui": "*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "lucide-react": "^0.468.0"

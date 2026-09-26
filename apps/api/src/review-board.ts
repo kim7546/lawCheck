@@ -20,6 +20,7 @@ const COOKIE = 'qaver_expert';
 const TTL = 7 * 24 * 60 * 60 * 1000;
 const cookieOptions = { httpOnly: true, sameSite: 'strict' as const, path: '/api/v1/bo' };
 const publicAccount = {
+  isActive: true,
   id: true,
   name: true,
   email: true,
@@ -60,6 +61,7 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
           })
         : null;
     if (!session || session.expiresAt <= new Date()) throw fail(401, '로그인이 필요합니다.');
+    if (!session.account.isActive) throw fail(403, '사용이 중지된 계정입니다.');
     return session.account;
   }
   async function login(req: Request, res: Response, accountId: string) {
@@ -153,7 +155,12 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
       });
       const [salt, expected] = user?.passwordHash.split(':') ?? ['0'.repeat(32), '0'.repeat(128)];
       const actual = (await derive(password, salt!, 64)) as Buffer;
-      if (!user || !expected || !timingSafeEqual(actual, Buffer.from(expected, 'hex')))
+      if (
+        !user ||
+        !user.isActive ||
+        !expected ||
+        !timingSafeEqual(actual, Buffer.from(expected, 'hex'))
+      )
         throw fail(401, '아이디 또는 이메일과 비밀번호가 올바르지 않습니다.');
       await login(req, res, user.id);
       res.json({
@@ -167,6 +174,16 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
   });
   router.get('/bo/me', async (req, res) => {
     res.json({ success: true, data: await account(req) });
+  });
+  router.get('/bo/menus', async (req, res) => {
+    const user = await account(req);
+    res.json({
+      success: true,
+      data: await db.boMenu.findMany({
+        where: { isActive: true, ...(!user.canManageCodes ? { key: { not: 'codes' } } : {}) },
+        orderBy: [{ sortOrder: 'asc' }, { key: 'asc' }],
+      }),
+    });
   });
   router.post('/bo/logout', async (req, res) => {
     const token = tokenFrom(req);

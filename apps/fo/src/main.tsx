@@ -1,24 +1,25 @@
-import React, { lazy, Suspense } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles.css';
 
 const isAdmin = /^\/admin(?:\/|$)/.test(window.location.pathname);
-const AdminApp = lazy(() => import('./admin/AdminApp'));
-if (isAdmin) {
-  document.title = 'AI QAVER Admin | 사용자 관리';
-  const robots = document.createElement('meta');
-  robots.name = 'robots';
-  robots.content = 'noindex, nofollow';
-  document.head.appendChild(robots);
-}
+// Compatibility link only: the Admin application is built and served independently.
+const adminOrigin =
+  import.meta.env.VITE_ADMIN_URL?.trim() ||
+  (import.meta.env.DEV ? 'http://127.0.0.1:5175' : 'https://admin.aiqaver.com');
+const adminUrl = `${adminOrigin.replace(/\/$/, '')}/admin${window.location.search}${window.location.hash}`;
+if (isAdmin) window.location.replace(adminUrl);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     {isAdmin ? (
-      <Suspense fallback={<p role="status">관리 화면을 불러오는 중입니다.</p>}>
-        <AdminApp />
-      </Suspense>
+      <main style={{ padding: 32 }}>
+        <h1>관리자 서비스</h1>
+        <p role="status">
+          <a href={adminUrl}>독립 관리자 서비스로 이동합니다.</a>
+        </p>
+      </main>
     ) : (
       <App />
     )}

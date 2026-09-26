@@ -4,4 +4,4 @@ import { localServerConfig } from './server.config.js';
 import { startServer } from './server.runtime.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../../../.env', import.meta.url)), quiet: true });
-startServer(localServerConfig());
+await startServer(localServerConfig());

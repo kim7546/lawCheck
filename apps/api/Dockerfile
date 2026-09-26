@@ -5,7 +5,9 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/fo/package.json apps/fo/package.json
 COPY apps/bo/package.json apps/bo/package.json
+COPY apps/admin/package.json apps/admin/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/ui/package.json packages/ui/package.json
 RUN npm ci --include=dev
 COPY tsconfig.base.json ./
 COPY apps/api ./apps/api

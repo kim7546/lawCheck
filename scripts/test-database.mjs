@@ -113,7 +113,7 @@ try {
   const tables = await db.query(
     "SELECT count(*)::int AS count FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'",
   );
-  assert.equal(tables.rows[0].count, 30);
+  assert.equal(tables.rows[0].count, 33);
   for (const snapshot of renameSnapshots.filter(({ table }) =>
     [
       'expert_accounts',
@@ -127,7 +127,7 @@ try {
     assert.deepEqual(
       (
         await db.query(
-          `SELECT to_jsonb(t) AS data FROM ${snapshot.table} t ORDER BY coalesce(to_jsonb(t)->>'id', to_jsonb(t)->>'account_id')`,
+          `SELECT ${snapshot.table === 'expert_accounts' ? "to_jsonb(t) - 'is_active' - 'updated_at'" : 'to_jsonb(t)'} AS data FROM ${snapshot.table} t ORDER BY coalesce(to_jsonb(t)->>'id', to_jsonb(t)->>'account_id')`,
         )
       ).rows,
       snapshot.rows
@@ -261,7 +261,7 @@ try {
     WHERE n.nspname='public' AND c.relkind='r'
   `)
   ).rows;
-  assert.equal(descriptions.length, 246);
+  assert.equal(descriptions.length, 261);
   for (const row of descriptions) {
     assert.match(row.table_description ?? '', /[가-힣]/, row.table_name);
     assert.match(row.column_description ?? '', /[가-힣]/, `${row.table_name}.${row.column_name}`);
@@ -314,7 +314,7 @@ try {
     backfilled,
   );
   console.log(
-    'Database integrity and legacy migration tests passed (isolated PostgreSQL/PGlite, 30 tables).',
+    'Database integrity and legacy migration tests passed (isolated PostgreSQL/PGlite, 33 tables).',
   );
 } finally {
   await db.close();

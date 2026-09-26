@@ -116,6 +116,11 @@ model CommunityReply {
 
 /// 전문가 회원: Office 로그인 계정, 직역, 요금제 및 관리 권한
 model ExpertAccount {
+  /// 계정 사용 여부: 중지 시 BO 및 관리자 로그인 차단
+  isActive Boolean @default(true) @map("is_active")
+  /// 회원 정보 최종 수정 일시
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  adminProfile ExpertAdminProfile?
   /// 로그인 아이디: 소문자로 정규화한 영문·숫자·밑줄
   username String? @unique @db.VarChar(30)
   /// 클로즈 베타 가입코드: 선택 입력, 공개 계정 응답에 포함하지 않음
@@ -149,6 +154,51 @@ model ExpertAccount {
   sessions ExpertLoginSession[]
   contributions ReviewContribution[]
   @@map("expert_accounts")
+}
+
+/// 관리자 회원 상세: 전문 직역과 독립적인 플랫폼 관리 자격
+model ExpertAdminProfile {
+  /// 공통 회원 식별자: 전문가와 관리자 역할 겸임 가능
+  accountId String @id @map("account_id") @db.Uuid
+  /// 관리자 권한 활성 여부
+  isActive Boolean @default(true) @map("is_active")
+  /// 관리자 등록 일시
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// 관리자 권한 최종 수정 일시
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  account ExpertAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sessions AdminLoginSession[]
+  @@map("expert_admin_profiles")
+}
+
+/// 관리자 로그인 세션: BO 로그인과 분리된 관리자 인증
+model AdminLoginSession {
+  /// 관리자 세션 식별자
+  id String @id @default(uuid()) @db.Uuid
+  /// 관리자 회원 식별자
+  accountId String @map("account_id") @db.Uuid
+  /// 인증 토큰의 SHA-256 해시
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  /// 세션 만료 일시
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  admin ExpertAdminProfile @relation(fields: [accountId], references: [accountId], onDelete: Cascade)
+  @@index([expiresAt])
+  @@map("admin_login_sessions")
+}
+
+/// BO 메뉴: 구현된 메뉴의 표시명, 순서와 노출 여부
+model BoMenu {
+  /// 메뉴 식별 코드: 구현된 화면과 연결
+  key String @id @db.VarChar(30)
+  /// 메뉴 표시명
+  label String @db.VarChar(50)
+  /// 메뉴 표시 순서
+  sortOrder Int @default(0) @map("sort_order")
+  /// 메뉴 표시 여부
+  isActive Boolean @default(true) @map("is_active")
+  /// 메뉴 최종 수정 일시
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@map("bo_menus")
 }
 
 /// 변호사 회원 상세: 변호사 가입 양식의 자격 정보와 사무소 연락처

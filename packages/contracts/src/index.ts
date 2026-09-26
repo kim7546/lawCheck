@@ -4,6 +4,61 @@ export interface HealthResponse {
 }
 
 export type ExpertGroupCode = string;
+export interface AdminIdentity {
+  id: string;
+  name: string;
+  email: string;
+  username: string | null;
+}
+export interface AdminUser extends AdminIdentity {
+  expertGroup: string | null;
+  expertCode: { name: string } | null;
+  plan: string;
+  planCode: { name: string };
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  adminProfile: { isActive: boolean } | null;
+  lawyerProfile: { officeName: string | null } | null;
+}
+export interface AdminUsersPage {
+  items: AdminUser[];
+  total: number;
+  page: number;
+}
+export interface BoMenuRecord {
+  key: 'dashboard' | 'reviews' | 'community' | 'codes';
+  label: string;
+  sortOrder: number;
+  isActive: boolean;
+  updatedAt: string;
+}
+export interface AdminSummary {
+  days: number;
+  since: string;
+  generatedAt: string;
+  questions: number;
+  requests: number;
+  verified: number;
+  waiting: number;
+  reviewing: number;
+  overdue: number;
+  completedAnswers: number;
+  selectedAnswers: number;
+  completionRate: number | null;
+  selectionRate: number | null;
+  averageHours: number | null;
+  activeExperts: number;
+  daily: { date: string; questions: number; requests: number; verified: number }[];
+  experts: {
+    id: string;
+    name: string;
+    group: string;
+    reviewing: number;
+    completed: number;
+    selected: number;
+  }[];
+}
 export interface CommonCodeRecord {
   code: string;
   name: string;

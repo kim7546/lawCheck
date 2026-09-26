@@ -1,5 +1,7 @@
 # lawCheck
 
+플랫폼 관리자는 `apps/admin`의 독립 서비스입니다. 운영 도메인은 `https://admin.aiqaver.com`, 로컬 주소는 `http://127.0.0.1:5175/admin`입니다. 실행·IntelliJ 설정·기존 BO 회원의 최초 관리자 지정은 [관리자 설정 안내](docs/admin.md)를 참조하세요.
+
 FO 사용자용 법률 채팅과 BO 법률사무실 관리 시스템의 개발 기반입니다.
 
 ## 실행
@@ -18,13 +20,14 @@ npm run dev
 | ------ | ----------------------------------- | ---------------------------------------------------- |
 | FO     | http://localhost:5173               | 홍보·채팅 첫 화면, 질문 예시, 대화 및 검증 요청 체험 |
 | BO     | http://localhost:5174               | 업무·변호사·휴가·발송 메뉴와 기본 화면               |
+| Admin  | http://127.0.0.1:5175/admin         | 운영 요약·사용자·공통코드·BO 메뉴 관리               |
 | API    | http://localhost:4000/api/v1/health | 상태 확인, 공개 사무실 설정                          |
 
-`npm run dev`로 세 서비스를 함께 실행하고 Ctrl+C로 종료합니다. 개발 서버는 로컬 인터페이스에만 바인딩합니다. API 포트를 변경하면 FO·BO의 Vite 프록시도 맞춰야 합니다.
+`npm run dev`로 API·FO·BO·Admin 네 서비스를 함께 실행하고 Ctrl+C로 종료합니다. Admin만 실행하려면 `npm run dev:admin`을 사용합니다. 개발 서버는 로컬 인터페이스에만 바인딩합니다. API 포트를 변경하면 FO·BO·Admin의 Vite 프록시도 맞춰야 합니다.
 
 ## 현재 구현 범위
 
-- React + TypeScript + Vite 기반 FO·BO 별도 앱
+- React + TypeScript + Vite 기반 FO·BO·Admin 별도 앱
 - Node.js + Express API와 공통 TypeScript 계약
 - PostgreSQL Docker Compose, Prisma 스키마·초기 migration·사무실 seed
 - TypeScript strict, ESLint, API 테스트, 데스크톱·모바일 Playwright 테스트
@@ -50,10 +53,12 @@ AI 답변은 구조화된 `answer`, `isLegalQuestion`으로 받습니다. 현재
 apps/
   fo/                 사용자용 lawCheck
   bo/                 법률사무실 관리 화면
+  admin/              플랫폼 관리자 독립 서비스
   api/
     src/              서버·health·공개 설정
     prisma/           schema·migration·seed
 packages/contracts/   공통 API 타입
+packages/ui/          BO·Admin 공통코드 편집 컴포넌트
 tests/                첫 화면 브라우저 테스트
 docs/                 기획서·MCP 설정 예시
 ```
@@ -62,7 +67,7 @@ BO는 관리용 애플리케이션입니다. 공통 Backend는 `apps/api`에 별
 
 ## Railway 체험 배포
 
-FO·BO의 로컬 개발 설정은 `vite.config.ts`, 배포 확인 설정은 `vite.preview.config.ts`로 분리합니다.
+FO·BO·Admin의 로컬 개발 설정은 각 앱의 `vite.config.ts`, 배포 확인 설정은 `vite.preview.config.ts`로 분리합니다. Admin Railway 서비스는 `/apps/admin/railway.json`을 사용합니다.
 배포용 API 주소는 `API_PROXY_TARGET`으로 지정하며, 미설정 시 로컬 API로 연결하지 않습니다.
 실행 명령과 환경변수는 [Railway 배포 안내](docs/railway-deployment.md)를 참고하세요.
 

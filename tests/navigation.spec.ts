@@ -95,15 +95,18 @@ test('FO sidebar toggles without losing the draft and keeps a compact brand', as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('admin shell has isolated navigation, direct access and no user API calls', async ({
+test('admin requires its own login and never calls FO or BO user APIs', async ({
   page,
 }, testInfo) => {
   const apiRequests: string[] = [];
   await page.route('**/api/**', (route) => {
     apiRequests.push(route.request().url());
-    return route.abort();
+    return route.fulfill({
+      status: 401,
+      json: { error: { message: '관리자 로그인이 필요합니다.' } },
+    });
   });
-  await page.goto('/admin');
+  await page.goto('http://127.0.0.1:5175/admin');
   await expect(page).toHaveTitle('AI QAVER Admin | 사용자 관리');
   const logo = page.getByRole('img', { name: 'AI QAVER Admin' });
   await expect(logo).toBeVisible();
@@ -114,21 +117,34 @@ test('admin shell has isolated navigation, direct access and no user API calls',
     'href',
     '/brand/aiqaver-symbol.png',
   );
-  await expect(page.getByRole('heading', { name: '관리 홈', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '관리자 로그인', exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('admin-home.png'), fullPage: true });
-  const nav = page.getByRole('navigation', { name: '사용자 관리' });
-  await nav.getByRole('link', { name: 'FO 사용자 관리', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'FO 사용자 관리', exact: true })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: '사용자 검색' })).toBeDisabled();
-  await nav.getByRole('link', { name: 'Office 사용자 관리', exact: true }).click();
-  await expect(page.getByRole('columnheader', { name: '전문가 그룹' })).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByRole('heading', { name: 'Office 사용자 관리', exact: true }),
-  ).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('admin-office-users.png'), fullPage: true });
-  await page.goto('/admin/#fo-users');
-  await expect(page.getByRole('heading', { name: 'FO 사용자 관리', exact: true })).toBeVisible();
-  expect(apiRequests).toEqual([]);
+  await expect(page.getByRole('navigation', { name: '관리자 메뉴' })).toHaveCount(0);
+  await page.goto('http://127.0.0.1:5175/admin/#users');
+  await expect(page.getByRole('heading', { name: '관리자 로그인', exact: true })).toBeVisible();
+  expect(apiRequests.length).toBeGreaterThan(0);
+  expect(apiRequests.every((url) => url.includes('/api/v1/admin/'))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('legacy FO admin path redirects to the independent Admin service with its selected menu', async ({
+  page,
+}) => {
+  const apiRequests: string[] = [];
+  await page.route('**/api/**', (route) => {
+    apiRequests.push(route.request().url());
+    return route.fulfill({
+      status: 401,
+      json: { error: { message: '관리자 로그인이 필요합니다.' } },
+    });
+  });
+  await page.goto('/admin#users');
+  await expect(page).toHaveURL('http://127.0.0.1:5175/admin#users');
+  await expect(page.getByRole('heading', { name: '관리자 로그인', exact: true })).toBeVisible();
+  expect(apiRequests.every((url) => url.startsWith('http://127.0.0.1:5175/api/v1/admin/'))).toBe(
+    true,
+  );
+  await page.goto('http://127.0.0.1:5175/');
+  await expect(page.getByRole('heading', { name: '관리자 로그인', exact: true })).toBeVisible();
+  await expect(page).toHaveTitle('AI QAVER Admin | 사용자 관리');
 });

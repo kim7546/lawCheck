@@ -7,6 +7,7 @@ import { ChatError, createAnswerGenerator } from './chat.js';
 import { createSessionStore, MAX_QUESTIONS } from './session.js';
 import type { PrismaClient } from '@prisma/client';
 import { reviewBoardRouter } from './review-board.js';
+import { adminRouter } from './admin.js';
 
 export function createApp(
   officeName = '법률사무소 IBS',
@@ -198,6 +199,7 @@ export function createApp(
       session.pending = false;
     }
   });
+  if (db) app.use('/api/v1/admin', adminRouter(db));
   if (db && storage) app.use('/api/v1', reviewBoardRouter(db, storage));
   app.use((_req, res) => {
     res.status(404).json({

@@ -6,9 +6,9 @@ import { api, ApiError } from './api';
 import { Dashboard, Community } from './community';
 import { BoardDetail } from './BoardDetail';
 import { SignupFields } from './SignupFields';
-import { CommonCodes } from './CommonCodes';
+import { CommonCodes } from '@lawcheck/ui/common-codes';
 import { LawyerSignupFields } from './LawyerSignupFields';
-import type { OfficeSignupConsent } from '@lawcheck/contracts';
+import type { BoMenuRecord, OfficeSignupConsent } from '@lawcheck/contracts';
 
 type User = {
   id: string;
@@ -50,6 +50,33 @@ function App() {
   const [reply, setReply] = useState('');
   const [status, setStatus] = useState('');
   const [notice, setNotice] = useState('');
+  const [menus, setMenus] = useState<BoMenuRecord[]>([]);
+  const [menusLoading, setMenusLoading] = useState(false);
+  const [menuRevision, setMenuRevision] = useState(0);
+  useEffect(() => {
+    if (!user) {
+      setMenus([]);
+      return;
+    }
+    let active = true;
+    setMenusLoading(true);
+    api<BoMenuRecord[]>('/menus')
+      .then((data) => {
+        if (active) {
+          setMenus(data);
+          setSection('dashboard');
+        }
+      })
+      .catch((e: unknown) => {
+        if (active) showError(e);
+      })
+      .finally(() => {
+        if (active) setMenusLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [user, menuRevision]);
   useEffect(() => {
     api<User>('/me')
       .then(setUser)
@@ -60,7 +87,7 @@ function App() {
       .finally(() => setInitializing(false));
   }, []);
   function showError(e: unknown) {
-    if (e instanceof ApiError && e.status === 401) {
+    if (e instanceof ApiError && [401, 403].includes(e.status)) {
       setUser(null);
       setSection('dashboard');
       setCommunityId(null);
@@ -289,41 +316,28 @@ function App() {
       ) : (
         <main className="board-main">
           <nav className="main-nav" aria-label="주 메뉴">
-            {(
-              [
-                ['dashboard', '대시보드'],
-                ['reviews', '검증요청 게시판'],
-                ['community', '커뮤니티'],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                aria-current={section === key ? 'page' : undefined}
-                disabled={busy}
-                onClick={() => {
-                  setSection(key);
-                  setStatus('');
-                  setPost(null);
-                  setCommunityId(null);
-                  setError('');
-                  setNotice('');
-                }}
-              >
-                {label}
-              </button>
-            ))}
-            {user.canManageCodes && (
-              <button
-                aria-current={section === 'codes' ? 'page' : undefined}
-                disabled={busy}
-                onClick={() => {
-                  setSection('codes');
-                  setError('');
-                  setNotice('');
-                }}
-              >
-                공통 코드 관리
-              </button>
+            {menus
+              .filter((menu) => menu.isActive && (menu.key !== 'codes' || user.canManageCodes))
+              .map(({ key, label }) => (
+                <button
+                  key={key}
+                  aria-current={section === key ? 'page' : undefined}
+                  disabled={busy}
+                  onClick={() => {
+                    setSection(key);
+                    setStatus('');
+                    setPost(null);
+                    setCommunityId(null);
+                    setError('');
+                    setNotice('');
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            {menusLoading && <span role="status">메뉴를 불러오는 중입니다.</span>}
+            {!menusLoading && !menus.length && (
+              <button onClick={() => setMenuRevision((v) => v + 1)}>메뉴 다시 불러오기</button>
             )}
           </nav>
           {error && (
@@ -337,7 +351,7 @@ function App() {
             </p>
           )}
           {section === 'codes' && user.canManageCodes ? (
-            <CommonCodes onError={showError} />
+            <CommonCodes request={api} onError={showError} />
           ) : section === 'dashboard' ? (
             <Dashboard
               onError={showError}

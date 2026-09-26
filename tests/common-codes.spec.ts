@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { CommonCodeRecord } from '@lawcheck/contracts';
+import { boMenus } from './bo-menus.fixture';
 
 test('administrator manages groups and details with conflict recovery; member menu stays hidden', async ({
   page,
@@ -32,6 +33,7 @@ test('administrator manages groups and details with conflict recovery; member me
         planCode: { name: 'Free' },
         canManageCodes: admin,
       };
+    else if (path.endsWith('/menus')) data = boMenus;
     else if (path.endsWith('/dashboard'))
       data = { reviews: [], bestPosts: [], reviewCount: 0, communityCount: 0 };
     else {

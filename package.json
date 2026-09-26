@@ -11,7 +11,8 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "concurrently -k -n API,FO,BO -c yellow,green,blue \"npm run dev -w @lawcheck/api\" \"npm run dev -w @lawcheck/fo\" \"npm run dev -w @lawcheck/bo\"",
+    "dev": "concurrently -k -n API,FO,BO,ADMIN -c yellow,green,blue,magenta \"npm run dev -w @lawcheck/api\" \"npm run dev -w @lawcheck/fo\" \"npm run dev -w @lawcheck/bo\" \"npm run dev -w @lawcheck/admin\"",
+    "dev:admin": "npm run dev -w @lawcheck/admin",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint apps packages tests",
@@ -19,8 +20,10 @@
     "format:check": "prettier --check apps packages tests scripts *.json *.ts *.js *.yml README.md",
     "test": "npm run test -w @lawcheck/api",
     "test:e2e": "playwright test",
+    "test:admin-service": "npm run build -w @lawcheck/admin && node scripts/test-admin-service.mjs",
     "db:generate": "npm run db:generate -w @lawcheck/api",
     "codes:admin": "node apps/api/prisma/code-admin.mjs",
+    "admin:account": "node apps/api/prisma/admin-account.mjs",
     "db:migrate": "npm run db:migrate -w @lawcheck/api",
     "db:migrate:dev": "npm run db:migrate:dev -w @lawcheck/api --",
     "db:seed": "npm run db:seed -w @lawcheck/api",

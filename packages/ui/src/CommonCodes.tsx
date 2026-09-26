@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { CommonCodeRecord } from '@lawcheck/contracts';
-import { api } from './api';
 import { RefreshCw } from 'lucide-react';
 
 type Draft = Pick<CommonCodeRecord, 'code' | 'name' | 'description' | 'sortOrder' | 'isActive'> & {
@@ -91,7 +90,15 @@ function CodeForm({
     </form>
   );
 }
-export function CommonCodes({ onError }: { onError: (error: unknown) => void }) {
+export function CommonCodes({
+  onError,
+  request,
+  showHeading = true,
+}: {
+  onError: (error: unknown) => void;
+  request: <T>(path: string, body?: object) => Promise<T>;
+  showHeading?: boolean;
+}) {
   const [groups, setGroups] = useState<CommonCodeRecord[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [details, setDetails] = useState<CommonCodeRecord[]>([]);
@@ -104,7 +111,7 @@ export function CommonCodes({ onError }: { onError: (error: unknown) => void }) 
   } | null>(null);
   useEffect(() => {
     let active = true;
-    api<CommonCodeRecord[]>('/code-groups')
+    request<CommonCodeRecord[]>('/code-groups')
       .then((data) => {
         if (active) setGroups(data);
       })
@@ -130,31 +137,34 @@ export function CommonCodes({ onError }: { onError: (error: unknown) => void }) 
       await action();
     } catch (e) {
       setError(e instanceof Error ? e.message : '요청을 처리하지 못했습니다.');
+      if (e instanceof Error && 'status' in e && [401, 403].includes(Number(e.status))) onError(e);
     } finally {
       setBusy(false);
     }
   }
   function select(group: string) {
     void run(async () => {
-      const next = await api<CommonCodeRecord[]>(`/code-groups/${group}/details`);
+      const next = await request<CommonCodeRecord[]>(`/code-groups/${group}/details`);
       setSelected(group);
       setDetails(next);
       setEditor(null);
     });
   }
   async function refresh() {
-    setGroups(await api<CommonCodeRecord[]>('/code-groups'));
-    if (selected) setDetails(await api<CommonCodeRecord[]>(`/code-groups/${selected}/details`));
+    setGroups(await request<CommonCodeRecord[]>('/code-groups'));
+    if (selected) setDetails(await request<CommonCodeRecord[]>(`/code-groups/${selected}/details`));
   }
   const current = groups.find((item) => item.code === selected);
   return (
     <>
       <div className="board-heading">
-        <div>
-          <span className="eyebrow">SYSTEM SETTINGS</span>
-          <h1>공통 코드 관리</h1>
-          <p>그룹과 상세 코드의 이름, 정렬순서, 사용 여부를 관리합니다.</p>
-        </div>
+        {showHeading && (
+          <div>
+            <span className="eyebrow">SYSTEM SETTINGS</span>
+            <h1>공통 코드 관리</h1>
+            <p>그룹과 상세 코드의 이름, 정렬순서, 사용 여부를 관리합니다.</p>
+          </div>
+        )}
         <button
           disabled={busy}
           onClick={() =>
@@ -281,7 +291,7 @@ export function CommonCodes({ onError }: { onError: (error: unknown) => void }) 
               void run(async () => {
                 const base =
                   editor.kind === 'group' ? '/code-groups' : `/code-groups/${selected}/details`;
-                await api(editor.value ? `${base}/${editor.value.code}` : base, draft);
+                await request(editor.value ? `${base}/${editor.value.code}` : base, draft);
                 setEditor(null);
                 await refresh();
                 setNotice('저장했습니다. 가입 화면은 다음 조회부터 변경된 코드를 사용합니다.');

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { officeSignupPolicy } from './office-policy.fixture';
+import { boMenus } from './bo-menus.fixture';
 
 test('expert signs up, claims a request and submits a verification answer', async ({
   page,
@@ -19,6 +20,7 @@ test('expert signs up, claims a request and submits a verification answer', asyn
     const path = new URL(route.request().url()).pathname;
     let data: unknown;
     if (path.endsWith('/signup-policy')) data = officeSignupPolicy;
+    else if (path.endsWith('/menus')) data = boMenus;
     else if (path.endsWith('/me')) {
       if (!authenticated)
         return route.fulfill({ status: 401, json: { error: { message: '로그인이 필요합니다.' } } });

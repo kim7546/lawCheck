@@ -1,4 +1,5 @@
 import { test, expect, type Locator } from '@playwright/test';
+import { boMenus } from './bo-menus.fixture';
 
 async function touch(
   target: Locator,
@@ -44,6 +45,7 @@ test('Free dashboard opens latest requests and community supports posting and re
     const method = route.request().method();
     let data: unknown;
     if (path.endsWith('/me')) data = author;
+    else if (path.endsWith('/menus')) data = boMenus;
     else if (path.endsWith('/dashboard'))
       data = {
         reviewCount: 7,
