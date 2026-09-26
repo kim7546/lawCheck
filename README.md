@@ -1,6 +1,6 @@
 # lawCheck
 
-플랫폼 관리자는 `apps/admin`의 독립 서비스입니다. 운영 도메인은 `https://admin.aiqaver.com`, 로컬 주소는 `http://127.0.0.1:5175/admin`입니다. 실행·IntelliJ 설정·기존 BO 회원의 최초 관리자 지정은 [관리자 설정 안내](docs/admin.md)를 참조하세요.
+플랫폼 관리자는 `apps/admin`의 독립 서비스입니다. 운영 주소는 `https://admin.aiqaver.com/`, 로컬 주소는 `http://127.0.0.1:5175/`입니다. 실행·IntelliJ 설정·기존 BO 회원의 최초 관리자 지정은 [관리자 설정 안내](docs/admin.md)를 참조하세요.
 
 FO 사용자용 법률 채팅과 BO 법률사무실 관리 시스템의 개발 기반입니다.
 
@@ -20,7 +20,7 @@ npm run dev
 | ------ | ----------------------------------- | ---------------------------------------------------- |
 | FO     | http://localhost:5173               | 홍보·채팅 첫 화면, 질문 예시, 대화 및 검증 요청 체험 |
 | BO     | http://localhost:5174               | 업무·변호사·휴가·발송 메뉴와 기본 화면               |
-| Admin  | http://127.0.0.1:5175/admin         | 운영 요약·사용자·공통코드·BO 메뉴 관리               |
+| Admin  | http://127.0.0.1:5175/              | 운영 요약·사용자·공통코드·BO 메뉴 관리               |
 | API    | http://localhost:4000/api/v1/health | 상태 확인, 공개 사무실 설정                          |
 
 `npm run dev`로 API·FO·BO·Admin 네 서비스를 함께 실행하고 Ctrl+C로 종료합니다. Admin만 실행하려면 `npm run dev:admin`을 사용합니다. 개발 서버는 로컬 인터페이스에만 바인딩합니다. API 포트를 변경하면 FO·BO·Admin의 Vite 프록시도 맞춰야 합니다.

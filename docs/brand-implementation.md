@@ -16,7 +16,6 @@ FO와 BO는 `packages/brand/tokens.css`를 공유합니다. 표면·테두리에
 `apps/{fo,bo}/public/brand`의 로고와 심벌은 PDF 2페이지 원본 영역을 렌더링한 이미지입니다. 로고 비율과 원본 색을 유지하며 흰 배경과 여백을 확보합니다. 원본 벡터 파일을 확보하면 같은 경로의 고해상도 에셋으로 교체할 수 있습니다.
 
 서비스 표기는 `aiqaver.com`, 로고 표기는 가이드의 `AI QAVER`를 따릅니다. 내부 npm 워크스페이스 이름과 API 계약은 유지합니다.
-BO의 FO 링크는 개발 환경에서 localhost:5173, 배포 환경에서 https://aiqaver.com을 기본값으로 사용하며 `VITE_FO_URL`로 지정할 수 있습니다.
 
 검증: `npm run build -w @lawcheck/fo`, `npm run build -w @lawcheck/bo`, `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`.
 기본 E2E 브라우저는 기존 Microsoft Edge이며, 환경변수로 설치된 Chrome을 선택할 수 있습니다.

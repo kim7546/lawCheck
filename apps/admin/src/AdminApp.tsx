@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ArrowUpRight,
-  LayoutDashboard,
-  ListTree,
-  LogOut,
-  Settings2,
-  ShieldCheck,
-  Users,
-} from 'lucide-react';
+import { LayoutDashboard, ListTree, LogOut, Settings2, ShieldCheck, Users } from 'lucide-react';
 import type { AdminIdentity } from '@lawcheck/contracts';
 import { CommonCodes } from '@lawcheck/ui/common-codes';
 import { adminApi, AdminApiError } from './api';
@@ -15,10 +7,6 @@ import { AdminOverview } from './AdminOverview';
 import { AdminUsers } from './AdminUsers';
 import { AdminMenus } from './AdminMenus';
 import './admin.css';
-
-const foUrl =
-  import.meta.env.VITE_FO_URL?.trim() ||
-  (import.meta.env.DEV ? 'http://127.0.0.1:5173' : 'https://aiqaver.com');
 
 const sections = {
   overview: {
@@ -146,9 +134,6 @@ export default function AdminApp() {
               <button className="primary">{busy ? '로그인 중…' : '관리자 로그인'}</button>
             </fieldset>
           </form>
-          <a href={foUrl}>
-            AI QAVER로 돌아가기 <ArrowUpRight size={14} />
-          </a>
         </main>
       </div>
     );
@@ -166,7 +151,7 @@ export default function AdminApp() {
         본문으로 이동
       </a>
       <aside className="admin-sidebar" aria-label="관리 메뉴">
-        <a className="admin-brand" href="/admin" aria-label="운영 요약">
+        <a className="admin-brand" href="/" aria-label="운영 요약">
           <img src="/brand/aiqaver-admin.png" alt="AI QAVER Admin" />
         </a>
         <p className="admin-nav-label">WORKSPACE</p>
@@ -183,9 +168,6 @@ export default function AdminApp() {
             <ShieldCheck size={16} />
             플랫폼 관리자
           </span>
-          <a href={foUrl}>
-            FO 사이트로 이동 <ArrowUpRight size={16} />
-          </a>
         </div>
       </aside>
       <div className="admin-workspace">

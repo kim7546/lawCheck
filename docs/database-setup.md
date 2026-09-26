@@ -68,7 +68,7 @@ npm run db:studio
 사무실 seed는 같은 `LAW_OFFICE_CODE`가 있으면 기존 값을 덮어쓰지 않습니다.
 선택적으로 `.env`에 `BOOTSTRAP_ADMIN_EMAIL`과 `BOOTSTRAP_ADMIN_PASSWORD`(12자 이상)를 함께 지정하면 초기 OFFICE_ADMIN 계정을 만듭니다. 기본 관리자 비밀번호는 없습니다. 기존 계정 비밀번호도 덮어쓰지 않습니다.
 
-이 설정은 `staff_accounts`의 사무소 직원용이며 플랫폼 `/admin` 로그인과는 별개입니다. 플랫폼 관리자는 BO에 먼저 가입한 뒤 API 환경변수 `ADMIN_EMAIL`로 지정합니다. 가입하지 않은 이메일이면 API 시작이 실패합니다. 자세한 내용은 [관리자 안내](admin.md)를 참조하세요.
+이 설정은 `staff_accounts`의 사무소 직원용이며 플랫폼 Admin 서비스 로그인과는 별개입니다. 플랫폼 관리자는 BO에 먼저 가입한 뒤 API 환경변수 `ADMIN_EMAIL`로 지정합니다. 가입하지 않은 이메일이면 API 시작이 실패합니다. 자세한 내용은 [관리자 안내](admin.md)를 참조하세요.
 이 계정은 DB 준비용이며 현재 BO 로그인 기능을 활성화하지 않습니다. 향후 인증 구현은 seed의 `scrypt$N$r$p$salt$hash` 형식을 검증해야 합니다.
 
 ```powershell

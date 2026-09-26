@@ -27,7 +27,7 @@ export default defineConfig({
     { name: 'api', url: 'http://127.0.0.1:4000/api/v1/health' },
     { name: 'fo', url: 'http://127.0.0.1:5173' },
     { name: 'bo', url: 'http://127.0.0.1:5174' },
-    { name: 'admin', url: 'http://127.0.0.1:5175/admin' },
+    { name: 'admin', url: 'http://127.0.0.1:5175/' },
   ].map(({ name, url }) => ({
     command: `npm run dev -w @lawcheck/${name}`,
     url,

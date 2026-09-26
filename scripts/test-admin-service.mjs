@@ -17,7 +17,7 @@ let admin;
 function statusForHost(origin, host) {
   // Use http.get so the exact Host header reaches Vite (fetch can normalize Host).
   return new Promise((resolve, reject) => {
-    get(`${origin}/admin`, { headers: { host } }, (res) => {
+    get(`${origin}/`, { headers: { host } }, (res) => {
       res.resume();
       resolve(res.statusCode);
     }).on('error', reject);
@@ -38,15 +38,13 @@ try {
     logLevel: 'silent',
   });
   const origin = `http://127.0.0.1:${admin.httpServer.address().port}`;
-  for (const path of ['/', '/admin', '/admin/']) {
-    const page = await fetch(`${origin}${path}`);
-    assert.equal(page.status, 200);
-    const html = await page.text();
-    assert.match(html, /AI QAVER Admin/);
-    assert.match(html, /noindex, nofollow/);
-    for (const asset of html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g))
-      assert.equal((await fetch(`${origin}${asset[1]}`)).status, 200);
-  }
+  const page = await fetch(`${origin}/`);
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /AI QAVER Admin/);
+  assert.match(html, /noindex, nofollow/);
+  for (const asset of html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g))
+    assert.equal((await fetch(`${origin}${asset[1]}`)).status, 200);
   assert.equal(
     (await fetch(`${origin}/brand/aiqaver-admin.png`)).headers.get('content-type'),
     'image/png',

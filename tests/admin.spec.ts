@@ -154,12 +154,8 @@ test('admin login, summary, member roles, codes and menu changes persist across 
         : { reviews: [], bestPosts: [], reviewCount: 0, communityCount: 0 };
     return route.fulfill({ json: { success: true, data } });
   });
-  await page.goto('/admin');
+  await page.goto('/');
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
-  await expect(page.getByRole('link', { name: /AI QAVER로 돌아가기/ })).toHaveAttribute(
-    'href',
-    'http://127.0.0.1:5173',
-  );
   await page.getByLabel('아이디 또는 이메일').fill('admin');
   await page.getByLabel('비밀번호', { exact: true }).fill('wrong-password-123');
   await page.getByRole('button', { name: '관리자 로그인', exact: true }).click();
@@ -234,11 +230,14 @@ test('admin login, summary, member roles, codes and menu changes persist across 
   await expect(page.getByRole('status')).toContainText('메뉴 설정을 저장');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('admin-menus.png'), fullPage: true });
+  await page.locator('.admin-brand').click();
+  await expect(page).toHaveURL('http://127.0.0.1:5175/');
+  await expect(page.getByRole('heading', { name: '운영 요약' })).toBeVisible();
   await page.goto('http://127.0.0.1:5174');
   const boNav = page.getByRole('navigation', { name: '주 메뉴' });
   await expect(boNav.getByRole('button').first()).toHaveText('전문가 검증');
   await expect(boNav.getByRole('button', { name: '커뮤니티' })).toHaveCount(0);
-  await page.goto('/admin/#menus');
+  await page.goto('/#menus');
   await page.getByRole('button', { name: '로그아웃' }).click();
   await expect(page.getByRole('heading', { name: '관리자 로그인', exact: true })).toBeVisible();
   await page.reload();
@@ -257,7 +256,7 @@ test('expired administrator session returns to login without exposing management
       json: { error: { message: '활성화된 관리자 권한이 필요합니다.' } },
     }),
   );
-  await page.goto('/admin');
+  await page.goto('/');
   await expect(page.getByRole('heading', { name: '관리자 로그인', exact: true })).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('활성화된 관리자');
   await expect(page.getByRole('navigation', { name: '관리자 메뉴' })).toHaveCount(0);

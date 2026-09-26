@@ -1,8 +1,8 @@
 # 플랫폼 관리자
 
-`apps/admin` 독립 서비스에서 운영 요약, 사용자 관리, 공통코드 관리, BO 메뉴 관리를 제공합니다. 로컬 주소는 `http://127.0.0.1:5175/admin`이며 루트 `/`에서도 같은 관리자 앱이 열립니다. FO·BO와 별도로 실행·빌드·배포하고 공통 Backend API와 DB를 사용합니다.
+`apps/admin` 독립 서비스에서 운영 요약, 사용자 관리, 공통코드 관리, BO 메뉴 관리를 제공합니다. 로컬 주소는 `http://127.0.0.1:5175/`입니다. FO·BO와 별도로 실행·빌드·배포하고 공통 Backend API와 DB를 사용합니다.
 
-운영 도메인은 `https://admin.aiqaver.com`이며 `/admin` 경로도 지원합니다. 코드에 도메인 허용 설정을 반영했으며 Railway 서비스 연결과 DNS 등록은 배포 시 적용해야 합니다.
+운영 주소는 `https://admin.aiqaver.com/`이며 서비스 루트에서 관리자 화면을 제공합니다. 코드에 도메인 허용 설정을 반영했으며 Railway 서비스 연결과 DNS 등록은 배포 시 적용해야 합니다.
 
 ## 독립 실행과 빌드
 
@@ -38,21 +38,19 @@ npm run preview -w @lawcheck/admin
 | Name                    | lawCheck Admin                          |
 | package.json            | `$PROJECT_DIR$/apps/admin/package.json` |
 | Command / Scripts       | `run` / `dev`                           |
-| Browser / Live Edit URL | `http://127.0.0.1:5175/admin`           |
+| Browser / Live Edit URL | `http://127.0.0.1:5175/`                |
 
 화면 중단점이 필요하면 Browser / Live Edit에서 After launch와 with JavaScript debugger를 선택하고 Chrome을 지정합니다. API는 기존 `lawCheck` Node.js 설정(`apps/api/src/server.ts`, `--import tsx`)으로 Debug 실행합니다. 화면 중단점은 `apps/admin/src/AdminApp.tsx`, API 중단점은 `apps/api/src/admin.ts`에 둡니다. 이전에 FO를 복제해 만든 로컬 Admin 설정이 있다면 package.json과 URL을 위 값으로 변경합니다.
 
-## 도메인과 서비스 간 이동
+## 도메인과 API 연결
 
 - Admin 배포 설정: `/apps/admin/railway.json`, 저장소 루트에서 빌드·실행합니다. `admin.aiqaver.com`은 기본 허용 호스트입니다. 추가 도메인은 `PREVIEW_ALLOWED_HOSTS`에 지정합니다. 상세 설정과 DNS 연결은 [Railway 안내](railway-deployment.md)를 참조합니다.
-- Admin의 `VITE_FO_URL`은 FO로 돌아가는 링크입니다. 빌드 시 설정하며 기본값은 개발에서 `http://127.0.0.1:5173`, 배포에서 `https://aiqaver.com`입니다.
-- 이전 FO `/admin` 주소는 독립 Admin 서비스로 이동합니다. 개발에서는 `http://127.0.0.1:5175/admin`, 배포에서는 `https://admin.aiqaver.com/admin`으로 이동합니다. 다른 배포 환경에서만 **FO 빌드 환경변수 `VITE_ADMIN_URL`**로 Admin origin을 덮어씁니다(`/admin` 경로 제외). 검색 문자열과 선택한 메뉴 해시는 유지됩니다.
 - 관리자 API 요청은 Admin 호스트의 `/api/v1/admin`에서 공통 API로 프록시합니다. 브라우저가 다른 도메인의 API를 직접 호출하지 않으므로 기존 HttpOnly·SameSite 쿠키 인증을 그대로 사용합니다.
 - 앱 분리에는 추가 DB migration이 필요하지 않습니다. 기존 관리자 테이블과 회원·권한을 그대로 사용합니다.
 
 ## 독립 서비스 점검
 
-독립 배포 점검은 `npm run test:admin-service`로 실행합니다. Admin만 빌드한 후 격리된 preview와 임시 API 서버로 `/`, `/admin`, 정적 파일, 허용 도메인, API 프록시 및 쿠키 전달을 검사합니다. 실제 회원·DB는 사용하지 않습니다.
+독립 배포 점검은 `npm run test:admin-service`로 실행합니다. Admin만 빌드한 후 격리된 preview와 임시 API 서버로 루트 `/`, 정적 파일, 허용 도메인, API 프록시 및 쿠키 전달을 검사합니다. 실제 회원·DB는 사용하지 않습니다.
 
 ## 계정과 최초 관리자
 
@@ -82,7 +80,7 @@ API는 시작할 때 해당 회원을 확인하고 관리자 권한을 연결합
 npm run admin:account -- grant
 ```
 
-추가 관리자는 Admin 서비스의 `/admin#users` 회원 수정에서 권한을 부여하거나 회수합니다. 자신의 계정·관리자 권한 중지는 차단합니다. 서버 명령으로 회수할 때도 마지막 활성 관리자는 보호합니다.
+추가 관리자는 Admin 서비스의 `/#users` 회원 수정에서 권한을 부여하거나 회수합니다. 자신의 계정·관리자 권한 중지는 차단합니다. 서버 명령으로 회수할 때도 마지막 활성 관리자는 보호합니다.
 
 환경변수로 지정했던 관리자의 권한을 회수했다면 `ADMIN_EMAIL`도 제거하거나 다른 활성 관리자로 바꿉니다. 재시작으로 회수된 권한을 자동 복구하지 않으며, 해당 이메일이 남아 있으면 오류로 시작을 중단합니다. 의도적으로 복구할 때만 `grant`를 실행합니다. 이메일 변경·삭제는 기존 관리자 권한을 자동 회수하지 않습니다.
 

@@ -42,10 +42,10 @@ BO는 명령의 workspace를 `@lawcheck/bo`로 바꾸고 해당 서비스의 도
 | Root Directory     | 저장소 루트 (`/`)                    |
 | Build Command      | `npm run build -w @lawcheck/admin`   |
 | Start Command      | `npm run preview -w @lawcheck/admin` |
-| Healthcheck Path   | `/admin`                             |
+| Healthcheck Path   | `/`                                  |
 | Domain Target port | 해당 서비스의 `PORT`와 동일          |
 
-`https://admin.aiqaver.com` 또는 `https://admin.aiqaver.com/admin`으로 접속합니다. 다음 변수는 **Admin 서비스**에 설정합니다.
+`https://admin.aiqaver.com/`으로 접속합니다. 다음 변수는 **Admin 서비스**에 설정합니다.
 
 | 변수                    | 값                                                                            |
 | ----------------------- | ----------------------------------------------------------------------------- |
@@ -54,11 +54,8 @@ BO는 명령의 workspace를 `@lawcheck/bo`로 바꾸고 해당 서비스의 도
 | `API_PROXY_TARGET`      | `https://api.aiqaver.com`. 별도 개발 환경은 해당 API origin. `/api` 경로 제외 |
 | `RAILWAY_PUBLIC_DOMAIN` | Railway 자동 제공 도메인                                                      |
 | `PREVIEW_ALLOWED_HOSTS` | 추가 도메인만 지정. `admin.aiqaver.com`은 코드에서 기본 허용                  |
-| `VITE_FO_URL`           | 돌아가기 링크용 FO origin, 빌드 시 적용                                       |
 
-API 프록시는 Admin 호스트에서 동작하며 관리자 쿠키에 Domain을 추가하지 않습니다. `/admin` healthcheck는 정적 화면 제공 여부만 확인하며 DB·관리자 로그인 성공을 보장하지 않습니다.
-
-이전 FO `/admin` 주소는 FO 재빌드 후 기본적으로 `https://admin.aiqaver.com/admin`으로 이동합니다. 기존 **FO 서비스**에 `VITE_ADMIN_URL`이 설정되어 있다면 `https://admin.aiqaver.com`으로 변경하거나 삭제한 후 재빌드합니다. 다른 환경에서만 이 변수로 이동할 origin을 덮어씁니다.
+API 프록시는 Admin 호스트에서 동작하며 관리자 쿠키에 Domain을 추가하지 않습니다. 루트 `/` healthcheck는 정적 화면 제공 여부만 확인하며 DB·관리자 로그인 성공을 보장하지 않습니다.
 
 Railway의 Admin 서비스 **Settings → Networking → Public Networking → Custom Domain**에 `admin.aiqaver.com`을 등록합니다. `PORT=4175`를 사용하면 도메인의 Target port도 `4175`로 설정합니다. DNS에는 Railway 화면에 표시되는 CNAME과 소유권 확인 TXT 레코드를 그대로 등록합니다. CNAME 이름은 `admin`이며, 대상과 TXT 값은 Railway가 해당 서비스에 발급한 값을 사용합니다. 도메인 확인이 완료되면 Railway가 HTTPS 인증서를 발급합니다. [Railway 도메인 설정 문서](https://docs.railway.com/networking/domains/working-with-domains)
 

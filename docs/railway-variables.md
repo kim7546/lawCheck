@@ -2,7 +2,7 @@
 
 Railway에서 대상 환경(개발 또는 운영)을 선택하고 각 서비스의 Variables에 입력합니다. 개발 환경에서도 배포한 앱은 `NODE_ENV=production`을 사용합니다. 개발·운영은 연결할 DB와 서비스 주소로 구분합니다.
 
-공통 API 공개 주소는 `https://api.aiqaver.com`을 사용합니다. 별도 개발 환경의 API에는 해당 환경의 API 주소를 지정합니다. 아래 예시의 `your-...example.com`은 같은 환경에 배포한 실제 화면 서비스 도메인으로 바꿉니다. `PORT`는 각 서비스의 Networking → Domain Target port와 맞춥니다. 기존 FO가 5173을 사용한다면 4173으로 바꾸지 않고 `PORT=5173`을 유지해도 됩니다.
+공통 API 공개 주소는 `https://api.aiqaver.com`을 사용합니다. 별도 개발 환경의 API에는 해당 환경의 API 주소를 지정합니다. `PORT`는 각 서비스의 Networking → Domain Target port와 맞춥니다. 기존 FO가 5173을 사용한다면 4173으로 바꾸지 않고 `PORT=5173`을 유지해도 됩니다.
 
 ## API
 
@@ -47,10 +47,9 @@ API 서비스의 Settings → Networking → Custom Domain에 `api.aiqaver.com`�
 NODE_ENV=production
 PORT=4175
 API_PROXY_TARGET=https://api.aiqaver.com
-VITE_FO_URL=https://your-fo-service.example.com
 ```
 
-`API_PROXY_TARGET`은 API의 origin이며 `/api`나 `/api/v1`을 붙이지 않습니다. `VITE_FO_URL`은 화면의 FO 이동 링크입니다. 운영에서 `https://aiqaver.com`을 쓸 수 있으며, 개발 환경에는 개발 FO 주소를 지정합니다.
+`API_PROXY_TARGET`은 API의 origin이며 `/api`나 `/api/v1`을 붙이지 않습니다.
 
 Config File은 [apps/admin/railway.json](../apps/admin/railway.json), Root Directory는 저장소 루트(`/`)입니다. `admin.aiqaver.com`과 `lawcheckadmin-production.up.railway.app`은 기본 허용 호스트입니다. 다른 도메인을 쓰면 `PREVIEW_ALLOWED_HOSTS=추가도메인`을 설정합니다.
 
@@ -76,10 +75,7 @@ API_PROXY_TARGET=https://api.aiqaver.com
 NODE_ENV=production
 PORT=4173
 API_PROXY_TARGET=https://api.aiqaver.com
-VITE_ADMIN_URL=https://your-admin-service.example.com
 ```
-
-`VITE_ADMIN_URL`은 기존 FO `/admin` 접속을 이동시킬 Admin origin이며 `/admin`을 붙이지 않습니다. 개발 환경에서는 개발 Admin 주소를 지정해야 운영 Admin으로 이동하지 않습니다.
 
 운영 커스텀 도메인을 사용하면 다음 값도 추가합니다. 개발 환경의 커스텀 도메인이 있다면 해당 호스트명으로 바꿉니다.
 
@@ -92,7 +88,6 @@ PREVIEW_ALLOWED_HOSTS=aiqaver.com,www.aiqaver.com
 - Admin·BO·FO의 `API_PROXY_TARGET`은 같은 환경의 공통 API를 가리킵니다. DB 연결과 AI 키, `ADMIN_EMAIL`은 API에만 설정합니다.
 - Railway 공개 도메인은 Networking에서 생성합니다. `RAILWAY_PUBLIC_DOMAIN`은 Railway가 제공하므로 직접 추가할 필요가 없습니다. 이 도메인은 세 화면의 preview 설정에서 자동 허용합니다.
 - `PREVIEW_ALLOWED_HOSTS`는 추가 커스텀 호스트명을 쉼표로 구분합니다. `https://`, 경로, 포트는 넣지 않습니다.
-- `VITE_FO_URL`, `VITE_ADMIN_URL`은 빌드 시 반영됩니다. 값을 변경한 뒤 해당 프런트엔드를 다시 빌드·배포합니다.
 - API와 DB를 준비하고 migration을 적용한 뒤 BO 가입 → API `ADMIN_EMAIL` 설정 → Admin 로그인을 진행합니다.
 - 루트 `.env.example`은 로컬 Docker·개발용입니다. 통째로 Railway에 복사하지 않습니다. `POSTGRES_*`는 로컬 DB용이고 `SMTP_*`, `OPENAI_CLASSIFIER_MODEL`은 현재 앱 코드에서 사용하지 않습니다.
 - `.env.example`은 참고 파일입니다. 이 파일 수정만으로 배포 환경변수가 적용되지는 않습니다.
