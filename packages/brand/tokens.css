@@ -1,4 +1,13 @@
 /* AI QAVER CI guide v1.0, p.2–3. Surface tints derive from the official palette. */
+/* Pretendard v1.3.9. Copyright (c) 2021 Kil Hyung-jin. SIL OFL 1.1: fonts/OFL.txt. */
+@font-face {
+  font-family: 'Pretendard Variable';
+  font-style: normal;
+  font-weight: 45 920;
+  font-display: swap;
+  src: url('./fonts/PretendardVariable.woff2') format('woff2');
+}
+
 :root {
   --brand-navy: #0b1f3b;
   --brand-blue: #2563eb;
@@ -9,5 +18,7 @@
   --brand-border: #dce5f0;
   --brand-soft: #eaf2ff;
   --brand-hover: #1d4ed8;
-  --brand-font: 'Malgun Gothic', '맑은 고딕', sans-serif;
+  --brand-font:
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI',
+    'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', sans-serif;
 }

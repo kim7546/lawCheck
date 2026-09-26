@@ -59,7 +59,7 @@ test('FO sidebar toggles without losing the draft and keeps a compact brand', as
     );
     await logo.click();
     await expect(sidebar).toHaveCSS('width', '266px');
-    await expect(logo).toHaveAttribute('aria-expanded', 'true');
+    await expect(logo).toHaveAccessibleName('AI QAVER 새 대화 시작');
     await expect(sidebar.locator('.brand-logo')).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('aiqaver.sidebar.collapsed'))).toBe(
       'false',

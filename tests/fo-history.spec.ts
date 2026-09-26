@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-test('sidebar keeps conversations and unread badges open review modals', async ({
+test('brand logo starts a new conversation, preserves history and keeps review notifications', async ({
   page,
+  isMobile,
 }, testInfo) => {
   test.setTimeout(60000);
   type Message = {
@@ -88,11 +89,23 @@ test('sidebar keeps conversations and unread badges open review modals', async (
     } else if (path.endsWith('/reviews')) data = review.answers.length ? [review] : [];
     await route.fulfill({ json: { success: true, data } });
   });
+  if (isMobile) {
+    // A desktop collapse preference must not change the visible mobile logo's action.
+    await page.addInitScript(() => localStorage.setItem('aiqaver.sidebar.collapsed', 'true'));
+  }
   await page.goto('/');
   await page.getByRole('textbox', { name: '질문', exact: true }).fill(review.question);
   await page.getByRole('button', { name: '질문 보내기' }).click();
   await expect(page.locator('.assistant-body > p')).toHaveText(`AI 답변: ${review.question}`);
-  await page.getByRole('button', { name: '새로운 질문 시작하기' }).click();
+  const draft = page.getByRole('textbox', { name: '질문', exact: true });
+  await draft.fill('새 대화로 이동하면 지울 작성 중 질문');
+  if (isMobile) await page.getByRole('button', { name: '대화 메뉴 열기', exact: true }).click();
+  await page.locator('.brand-logo').click();
+  await expect(page.getByRole('heading', { name: /법률이 궁금할 때/ })).toBeVisible();
+  await expect(page.locator('.assistant-body')).toHaveCount(0);
+  await expect(draft).toHaveValue('');
+  await expect(draft).toBeFocused();
+  expect(active).toBe(secondId);
   await page.getByRole('textbox', { name: '질문', exact: true }).fill('퇴직금을 계산하고 싶어요.');
   await page.getByRole('button', { name: '질문 보내기' }).click();
   await expect(page.locator('.assistant-body > p')).toContainText('퇴직금을 계산');

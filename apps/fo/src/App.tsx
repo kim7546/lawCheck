@@ -209,6 +209,7 @@ export default function App() {
   const menuButton = useRef<HTMLButtonElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const localDrafts = useRef(new Map<string, ChatTurn[]>());
+  const logoOpensSidebar = sidebarCollapsed && !mobileViewport;
   const remaining = Math.max(0, quota - (loading ? 1 : 0));
   const limitReached = config.questionLimitEnabled && remaining === 0;
   const latestId = turns.at(-1)?.id;
@@ -587,10 +588,14 @@ export default function App() {
             <button
               ref={sidebarLogo}
               className="sidebar-logo"
-              aria-label={sidebarCollapsed ? '대화 메뉴 열기' : 'AI QAVER'}
-              aria-expanded={!sidebarCollapsed}
-              aria-controls="conversation-sidebar"
-              onClick={() => setSidebarCollapsed(false)}
+              aria-label={logoOpensSidebar ? '대화 메뉴 열기' : 'AI QAVER 새 대화 시작'}
+              aria-expanded={logoOpensSidebar ? false : undefined}
+              aria-controls={logoOpensSidebar ? 'conversation-sidebar' : undefined}
+              disabled={!logoOpensSidebar && (loading || switching || !ready)}
+              onClick={() => {
+                if (logoOpensSidebar) setSidebarCollapsed(false);
+                else void newConversation();
+              }}
             >
               <img className="brand-logo" src="/brand/aiqaver-logo.png" alt="AI QAVER" />
               <img className="brand-symbol" src="/brand/aiqaver-symbol.png" alt="AI QAVER" />
