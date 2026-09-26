@@ -192,9 +192,6 @@ export default function AdminApp() {
       </aside>
       <div className="admin-workspace">
         <header className="admin-header">
-          <span>
-            AI QAVER <span className="admin-header-divider">/</span> Admin
-          </span>
           <div className="admin-account">
             <span>{user.name}</span>
             <button
