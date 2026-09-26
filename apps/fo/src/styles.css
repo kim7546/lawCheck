@@ -367,15 +367,17 @@ p {
   margin: auto;
 }
 .hero h1 {
+  display: grid;
   font-size: 31px;
   line-height: 1.5;
   letter-spacing: -1.1px;
+  word-break: keep-all;
   font-weight: 600;
   margin: 0;
   color: #2a3340;
 }
-.hero h1 span {
-  color: var(--brand-blue);
+.hero-question {
+  color: #000;
 }
 .hero p {
   color: #929aa6;
@@ -383,12 +385,7 @@ p {
   margin: 17px 0 8px;
 }
 .hero-verification {
-  display: block;
-  margin-bottom: 12px;
-  font-size: clamp(20px, 2.4vw, 24px);
-  line-height: 1.5;
-  letter-spacing: -0.5px;
-  word-break: keep-all;
+  font-weight: 700;
   color: var(--brand-blue);
 }
 .composer-section {
@@ -1081,7 +1078,7 @@ dialog::backdrop {
     min-height: 0;
   }
   .hero h1 {
-    font-size: 25px;
+    font-size: clamp(23px, 6.4vw, 25px);
     letter-spacing: -0.9px;
   }
   .hero p {

@@ -800,12 +800,11 @@ export default function App() {
             {!turns.length ? (
               <section className="hero">
                 <h1>
-                  법률이 궁금할 때,
-                  <br />
-                  <span>AI에게 물어보세요.</span>
+                  <span>법률이 궁금할 때,</span>
+                  <span className="hero-question">AI에게 물어보세요.</span>
+                  <strong className="hero-verification">변호사가 검증해드립니다.</strong>
                 </h1>
                 <p>
-                  <strong className="hero-verification">변호사가 검증해드립니다.</strong>
                   법률 고민은 AI와 먼저 정리하고,
                   <br /> 원하는 답변은 변호사에게 검증을 요청하세요.
                 </p>
