@@ -68,7 +68,7 @@ BO는 관리용 애플리케이션입니다. 공통 Backend는 `apps/api`에 별
 ## Railway 체험 배포
 
 FO·BO·Admin의 로컬 개발 설정은 각 앱의 `vite.config.ts`, 배포 확인 설정은 `vite.preview.config.ts`로 분리합니다. Admin Railway 서비스는 `/apps/admin/railway.json`을 사용합니다.
-배포용 API 주소는 `API_PROXY_TARGET`으로 지정하며, 미설정 시 로컬 API로 연결하지 않습니다.
+배포용 공통 API 주소는 `https://api.aiqaver.com`입니다. Admin·BO·FO에 `API_PROXY_TARGET=https://api.aiqaver.com`을 지정하고, 별도 개발 환경은 해당 API origin을 사용합니다. 미설정 시 로컬 API로 연결하지 않습니다. 도메인 연결은 [Railway 배포 안내](docs/railway-deployment.md)를 참조하세요.
 실행 명령과 환경변수는 [Railway 배포 안내](docs/railway-deployment.md)를 참고하세요.
 
 API의 로컬 설정은 `apps/api/src/server.config.ts`, Railway 배포 설정은 `apps/api/src/server.deploy.config.ts`입니다. API 서비스에서 `/apps/api/railway.json`을 Config File로 지정하고 저장소 루트에서 빌드·실행합니다. `npm run start -w @lawcheck/api`는 배포 진입 파일로 실행하여 `0.0.0.0:$PORT`에 바인딩하며 로컬 `.env`를 읽지 않습니다. IntelliJ 디버그는 기존 `apps/api/src/server.ts`를 그대로 사용합니다.

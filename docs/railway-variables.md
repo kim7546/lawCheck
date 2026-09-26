@@ -2,7 +2,7 @@
 
 Railway에서 대상 환경(개발 또는 운영)을 선택하고 각 서비스의 Variables에 입력합니다. 개발 환경에서도 배포한 앱은 `NODE_ENV=production`을 사용합니다. 개발·운영은 연결할 DB와 서비스 주소로 구분합니다.
 
-아래 예시의 `your-...example.com`은 같은 환경에 배포한 실제 서비스 도메인으로 바꿉니다. `PORT`는 각 서비스의 Networking → Domain Target port와 맞춥니다. 기존 FO가 5173을 사용한다면 4173으로 바꾸지 않고 `PORT=5173`을 유지해도 됩니다.
+공통 API 공개 주소는 `https://api.aiqaver.com`을 사용합니다. 별도 개발 환경의 API에는 해당 환경의 API 주소를 지정합니다. 아래 예시의 `your-...example.com`은 같은 환경에 배포한 실제 화면 서비스 도메인으로 바꿉니다. `PORT`는 각 서비스의 Networking → Domain Target port와 맞춥니다. 기존 FO가 5173을 사용한다면 4173으로 바꾸지 않고 `PORT=5173`을 유지해도 됩니다.
 
 ## API
 
@@ -37,6 +37,8 @@ API는 기존 BO 회원에 플랫폼 관리자 권한을 연결합니다. 미가
 
 API의 Railway Config File은 [apps/api/railway.database.json](../apps/api/railway.database.json)을 사용합니다. 배포 전에 `npm run db:deploy`로 migration과 seed를 적용합니다. Root Directory는 저장소 루트(`/`)입니다. 관리자 migration `202609260001_platform_admin`이 포함되어야 합니다.
 
+API 서비스의 Settings → Networking → Custom Domain에 `api.aiqaver.com`을 등록하고 `PORT=4000`이면 Target port도 `4000`으로 설정합니다. DNS에는 Railway가 안내한 CNAME과 소유권 확인 TXT를 등록합니다. 도메인 검증과 HTTPS 인증서 발급 후 `https://api.aiqaver.com/api/v1/health`의 HTTP 200 및 `success: true` 응답을 확인하고 Admin·BO·FO의 API 주소를 전환합니다. 상세 내용은 [배포 안내](railway-deployment.md)를 참조하세요.
+
 ## Admin
 
 참고 파일: [apps/admin/.env.example](../apps/admin/.env.example)
@@ -44,7 +46,7 @@ API의 Railway Config File은 [apps/api/railway.database.json](../apps/api/railw
 ```dotenv
 NODE_ENV=production
 PORT=4175
-API_PROXY_TARGET=https://your-api-service.example.com
+API_PROXY_TARGET=https://api.aiqaver.com
 VITE_FO_URL=https://your-fo-service.example.com
 ```
 
@@ -61,7 +63,7 @@ Config File은 [apps/admin/railway.json](../apps/admin/railway.json), Root Direc
 ```dotenv
 NODE_ENV=production
 PORT=4174
-API_PROXY_TARGET=https://your-api-service.example.com
+API_PROXY_TARGET=https://api.aiqaver.com
 ```
 
 `office.aiqaver.com`은 기본 허용 호스트입니다. 다른 커스텀 도메인을 쓰면 `PREVIEW_ALLOWED_HOSTS=추가도메인`을 설정합니다. BO에는 별도의 관리자 이메일이나 DB 연결값을 넣지 않습니다.
@@ -73,7 +75,7 @@ API_PROXY_TARGET=https://your-api-service.example.com
 ```dotenv
 NODE_ENV=production
 PORT=4173
-API_PROXY_TARGET=https://your-api-service.example.com
+API_PROXY_TARGET=https://api.aiqaver.com
 VITE_ADMIN_URL=https://your-admin-service.example.com
 ```
 

@@ -47,14 +47,14 @@ BO는 명령의 workspace를 `@lawcheck/bo`로 바꾸고 해당 서비스의 도
 
 `https://admin.aiqaver.com` 또는 `https://admin.aiqaver.com/admin`으로 접속합니다. 다음 변수는 **Admin 서비스**에 설정합니다.
 
-| 변수                    | 값                                                                     |
-| ----------------------- | ---------------------------------------------------------------------- |
-| `NODE_ENV`              | `production`                                                           |
-| `PORT`                  | 서비스 Target port에 맞게 설정, 기본값 `4175`                          |
-| `API_PROXY_TARGET`      | 실제 공통 API의 origin, `/api` 경로 제외. 로그인·관리 기능 사용에 필수 |
-| `RAILWAY_PUBLIC_DOMAIN` | Railway 자동 제공 도메인                                               |
-| `PREVIEW_ALLOWED_HOSTS` | 추가 도메인만 지정. `admin.aiqaver.com`은 코드에서 기본 허용           |
-| `VITE_FO_URL`           | 돌아가기 링크용 FO origin, 빌드 시 적용                                |
+| 변수                    | 값                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `NODE_ENV`              | `production`                                                                  |
+| `PORT`                  | 서비스 Target port에 맞게 설정, 기본값 `4175`                                 |
+| `API_PROXY_TARGET`      | `https://api.aiqaver.com`. 별도 개발 환경은 해당 API origin. `/api` 경로 제외 |
+| `RAILWAY_PUBLIC_DOMAIN` | Railway 자동 제공 도메인                                                      |
+| `PREVIEW_ALLOWED_HOSTS` | 추가 도메인만 지정. `admin.aiqaver.com`은 코드에서 기본 허용                  |
+| `VITE_FO_URL`           | 돌아가기 링크용 FO origin, 빌드 시 적용                                       |
 
 API 프록시는 Admin 호스트에서 동작하며 관리자 쿠키에 Domain을 추가하지 않습니다. `/admin` healthcheck는 정적 화면 제공 여부만 확인하며 DB·관리자 로그인 성공을 보장하지 않습니다.
 
@@ -81,6 +81,12 @@ API를 연결하지 않아도 체험 화면은 기본 사무소명으로 열립�
 이 변수는 서버 측 프록시 설정이며 브라우저에 주입하지 않습니다.
 
 ## API 서비스
+
+공통 API 공개 주소는 `https://api.aiqaver.com`을 사용합니다. API 서비스의 **Settings → Networking → Public Networking → Custom Domain**에 `api.aiqaver.com`을 추가합니다. `PORT=4000`을 사용하면 도메인의 Target port도 `4000`으로 지정합니다.
+
+DNS에 CNAME 이름 `api`와 Railway가 발급한 대상 호스트를 등록하고, 소유권 확인 TXT도 Railway에 표시된 이름·값 그대로 등록합니다. DNS 검증과 HTTPS 인증서 발급 후 `https://api.aiqaver.com/api/v1/health`에서 HTTP 200 및 `success: true`를 확인합니다. [Railway 도메인 설정 문서](https://docs.railway.com/networking/domains/working-with-domains)
+
+이후 Admin·BO·FO 서비스의 `API_PROXY_TARGET=https://api.aiqaver.com`을 설정하고 재배포합니다. URL에 `:4000`, `/api`, `/api/v1`은 붙이지 않습니다. 별도 개발 환경에서는 해당 환경의 API origin을 사용합니다. API 자체는 Express로 실행하며 `preview.allowedHosts` 설정을 사용하지 않습니다. 브라우저는 계속 각 화면 서비스의 `/api`로 요청하고 화면 서버가 API 도메인으로 전달합니다.
 
 API도 로컬 개발과 Railway 배포 설정을 분리합니다.
 
@@ -128,7 +134,7 @@ FO의 포트와 API 포트는 서로 달라도 됩니다. 모델은 사용하려
 `.env.example`은 참고용이며 배포 서버가 자동으로 읽지 않습니다. 비밀 키는 Railway Variables에 입력합니다.
 위 `/apps/api/railway.json`은 DB 없이 시작하는 기존 설정입니다. PostgreSQL을 함께 준비하려면 [DB 설치·Railway 연결 안내](database-setup.md)에 따라 DB 서비스를 생성하고 API Config File을 `/apps/api/railway.database.json`으로 변경하세요. 이 설정은 Docker 빌드와 `npm run db:deploy` pre-deploy migration을 포함합니다.
 
-FO·BO Variables의 `API_PROXY_TARGET`은 `https://<API 공개 도메인>`으로 지정하고 재배포합니다.
+Admin·FO·BO Variables의 `API_PROXY_TARGET`은 `https://api.aiqaver.com`으로 지정하고 재배포합니다. 별도 개발 환경은 해당 API origin으로 바꿉니다.
 API 경로 `/api/v1`은 붙이지 않습니다. 브라우저 요청은 FO·BO의 `/api` 프록시를 통해 전달됩니다.
 
 배포 로그에 아래처럼 `0.0.0.0`과 지정 포트가 나와야 합니다.
@@ -137,7 +143,7 @@ API 경로 `/api/v1`은 붙이지 않습니다. 브라우저 요청은 FO·BO의
 LawCheck API: http://0.0.0.0:4000/api/v1/health (prototype)
 ```
 
-`https://<API 공개 도메인>/api/v1/health`가 200이면 API 연결이 정상입니다.
+`https://api.aiqaver.com/api/v1/health`가 200이면 API 연결이 정상입니다. 이 healthcheck는 DB·로그인·AI 답변 성공까지 검증하지는 않습니다.
 루트 `/`는 제공하지 않으므로 404가 정상입니다. health는 DB·OpenAI 연결까지 확인하지 않습니다.
 502가 계속되면 Deployment의 설정 출처에서 새 `railway.json` 적용 여부, 위 시작 로그,
 도메인의 Target port를 확인합니다. `127.0.0.1` 로그가 나오면 여전히 로컬 진입 파일로 실행 중입니다.
