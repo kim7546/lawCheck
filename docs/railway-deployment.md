@@ -1,5 +1,7 @@
 # Railway FO·BO·Admin·API 배포
 
+서비스별 Variables 입력값과 복사 예시는 [Railway 환경변수 안내](railway-variables.md)를 참조하세요. 개발 환경과 운영 환경의 DB·API·화면 주소를 각각 연결합니다.
+
 FO·BO·Admin은 각각 개발용 `vite.config.ts`와 배포 확인용 `vite.preview.config.ts`를 분리합니다.
 
 | 항목        | 로컬 개발 (`npm run dev`)      | 배포 확인 (`npm run preview`)                     |

@@ -51,10 +51,19 @@ try {
     (await fetch(`${origin}/brand/aiqaver-admin.png`)).headers.get('content-type'),
     'image/png',
   );
-  for (const host of ['admin.aiqaver.com', 'admin.preview.test', 'custom-admin.preview.test'])
+  for (const host of [
+    'admin.aiqaver.com',
+    'lawcheckadmin-production.up.railway.app',
+    'admin.preview.test',
+    'custom-admin.preview.test',
+  ])
     assert.equal(await statusForHost(origin, host), 200);
   assert.equal(await statusForHost(origin, 'untrusted.invalid'), 403);
   assert.equal(await statusForHost(origin, 'admin.aiqaver.com.untrusted.invalid'), 403);
+  assert.equal(
+    await statusForHost(origin, 'lawcheckadmin-production.up.railway.app.untrusted.invalid'),
+    403,
+  );
   const response = await fetch(`${origin}/api/v1/admin/me`, {
     headers: { Cookie: 'qaver_admin=preview-test' },
   });

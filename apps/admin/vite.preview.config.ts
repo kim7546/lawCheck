@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 const apiTarget = process.env.API_PROXY_TARGET?.trim();
 const allowedHosts = [
   'admin.aiqaver.com',
+  'lawcheckadmin-production.up.railway.app',
   process.env.RAILWAY_PUBLIC_DOMAIN ?? '',
   ...(process.env.PREVIEW_ALLOWED_HOSTS ?? '').split(','),
 ]
