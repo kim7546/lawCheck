@@ -32,6 +32,10 @@
   color: white;
   border-color: #2563eb;
 }
+.admin-shell button.primary:hover:not(:disabled),
+.admin-login button.primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
 .admin-shell label,
 .admin-login label {
   display: grid;
@@ -492,6 +496,83 @@
   margin: 22px 0;
   font-size: 12px;
 }
+.admin-question-filters {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 0;
+}
+.admin-question-filters label {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+  color: #66778e;
+  min-width: 0;
+}
+.admin-question-filters input,
+.admin-question-filters select {
+  width: 160px;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+}
+.admin-question-summary,
+.admin-question-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.admin-question-summary {
+  justify-content: space-between;
+}
+.admin-question-summary > strong {
+  font-size: 16px;
+}
+.admin-question-content,
+.admin-question-answer {
+  padding: 20px 24px;
+}
+.admin-question-content {
+  padding-top: 0;
+}
+.admin-question-answer {
+  border-top: 1px solid #e3e9f1;
+  background: #f8faff;
+}
+.admin-question-answer h3 {
+  margin: 0;
+  font-size: 13px;
+  color: #2563eb;
+}
+.admin-message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  font-size: 13px;
+  margin: 12px 0 0;
+}
+.admin-question-empty {
+  margin: 0;
+  padding: 16px 24px;
+  border-top: 1px solid #e3e9f1;
+  font-size: 12px;
+  color: #728096;
+}
+.admin-topic-share {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.admin-topic-share progress {
+  width: clamp(50px, 12vw, 180px);
+  height: 10px;
+  accent-color: #2563eb;
+}
+.admin-topic-share span {
+  min-width: 45px;
+}
 .admin-editor {
   padding: 24px;
 }
@@ -687,7 +768,7 @@
     display: none;
   }
   .admin-sidebar nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 3px;
   }
   .admin-sidebar nav a {

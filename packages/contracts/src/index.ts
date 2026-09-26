@@ -26,6 +26,45 @@ export interface AdminUsersPage {
   total: number;
   page: number;
 }
+export const questionTopics = [
+  { code: 'realEstate', label: '부동산·임대차' },
+  { code: 'labor', label: '노동·직장' },
+  { code: 'money', label: '민사·금전' },
+  { code: 'family', label: '가사·생활' },
+  { code: 'criminal', label: '형사·범죄' },
+  { code: 'business', label: '사업·세무' },
+  { code: 'other', label: '기타·미분류' },
+  { code: 'nonLegal', label: '비법률 질문' },
+] as const;
+export type QuestionTopic = (typeof questionTopics)[number]['code'];
+export interface AdminQuestionPeriod {
+  startDate: string;
+  endDate: string;
+}
+export interface AdminQuestion {
+  id: string;
+  content: string;
+  createdAt: string;
+  processingStatus: 'RECEIVED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  topic: QuestionTopic;
+  answers: {
+    id: string;
+    content: string;
+    createdAt: string;
+    kind: 'AI' | 'NOTICE' | 'EXPERT';
+    author: string;
+  }[];
+}
+export interface AdminQuestionsPage extends AdminQuestionPeriod {
+  items: AdminQuestion[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+export interface AdminQuestionStatistics extends AdminQuestionPeriod {
+  total: number;
+  topics: { topic: QuestionTopic; count: number; percentage: number }[];
+}
 export interface BoMenuRecord {
   key: 'dashboard' | 'reviews' | 'community' | 'codes';
   label: string;

@@ -5,6 +5,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import type { AdminSummary } from '@lawcheck/contracts';
 import { ChatError } from './chat.js';
 import { commonCodesRouter } from './common-codes.js';
+import { adminQuestionsRouter } from './admin-questions.js';
 
 const derive = promisify(scrypt);
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -134,6 +135,7 @@ export function adminRouter(db: PrismaClient) {
     res.json({ success: true, data: { id, name, email, username } });
   });
   router.use(commonCodesRouter(db, async () => ({ canManageCodes: true }), '/code-groups'));
+  router.use(adminQuestionsRouter(db));
   router.get('/summary', async (req, res) => {
     const days = Number(req.query.days ?? 30);
     if (![7, 30, 90].includes(days))

@@ -690,6 +690,7 @@ model ChatMessage {
   @@unique([sessionId, requestKey])
   @@index([lawOfficeId, sessionId, parentMessageId])
   @@index([lawOfficeId, processingStatus, createdAt])
+  @@index([role, messageType, createdAt, id])
   @@map("chat_messages")
 }
 

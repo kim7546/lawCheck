@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LayoutDashboard, ListTree, LogOut, Settings2, ShieldCheck, Users } from 'lucide-react';
+import {
+  BarChart3,
+  LayoutDashboard,
+  ListTree,
+  LogOut,
+  MessageSquare,
+  Settings2,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import type { AdminIdentity } from '@lawcheck/contracts';
 import { CommonCodes } from '@lawcheck/ui/common-codes';
 import { adminApi, AdminApiError } from './api';
 import { AdminOverview } from './AdminOverview';
 import { AdminUsers } from './AdminUsers';
 import { AdminMenus } from './AdminMenus';
+import { AdminQuestions, AdminQuestionStatistics } from './AdminQuestions';
 import './admin.css';
 
 const sections = {
@@ -13,6 +23,16 @@ const sections = {
     title: '운영 요약',
     description: '질문부터 전문가 검증까지, 서비스의 처리 현황을 확인합니다.',
     icon: LayoutDashboard,
+  },
+  questions: {
+    title: '질문현황',
+    description: '기간별 질문 원문과 AI·전문가 답변을 확인합니다.',
+    icon: MessageSquare,
+  },
+  statistics: {
+    title: '통계',
+    description: '접수된 질문을 주제별로 모아 건수와 비중을 확인합니다.',
+    icon: BarChart3,
   },
   users: {
     title: '사용자 관리',
@@ -210,6 +230,10 @@ export default function AdminApp() {
           )}
           {section === 'overview' ? (
             <AdminOverview onError={onSessionError} />
+          ) : section === 'questions' ? (
+            <AdminQuestions onError={onSessionError} />
+          ) : section === 'statistics' ? (
+            <AdminQuestionStatistics onError={onSessionError} />
           ) : section === 'users' ? (
             <AdminUsers selfId={user.id} onError={onSessionError} onSelfUpdate={setUser} />
           ) : section === 'menus' ? (
