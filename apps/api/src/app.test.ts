@@ -203,6 +203,7 @@ test('public config exposes office branding without environment secrets', async 
     maxQuestions: 3,
     questionLimitEnabled: false,
     remainingQuestions: null,
+    voiceInputEnabled: false,
   });
 });
 test('prototype cannot accidentally accept or send real verification requests', async () => {

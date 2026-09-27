@@ -8,6 +8,7 @@ import { createSessionStore, MAX_QUESTIONS } from './session.js';
 import type { PrismaClient } from '@prisma/client';
 import { reviewBoardRouter } from './review-board.js';
 import { adminRouter } from './admin.js';
+import { createVoiceService, type VoiceOptions } from './voice.js';
 
 export function createApp(
   officeName = '법률사무소 IBS',
@@ -19,10 +20,20 @@ export function createApp(
     questionLimitEnabled = process.env.QUESTION_LIMIT_ENABLED === 'true',
     storage,
     db,
-  }: { questionLimitEnabled?: boolean; storage?: ChatStorage; db?: PrismaClient } = {},
+    voice = {
+      enabled: process.env.VOICE_INPUT_ENABLED !== 'false',
+      apiKey: process.env.OPENAI_API_KEY,
+    },
+  }: {
+    questionLimitEnabled?: boolean;
+    storage?: ChatStorage;
+    db?: PrismaClient;
+    voice?: VoiceOptions;
+  } = {},
 ) {
   const app = express();
   const getSession = createSessionStore();
+  const voiceService = createVoiceService(voice);
   app.disable('x-powered-by');
   app.use(helmet());
   app.use(express.json({ limit: '128kb' }));
@@ -44,7 +55,57 @@ export function createApp(
       maxQuestions: MAX_QUESTIONS,
       questionLimitEnabled,
       remainingQuestions: questionLimitEnabled ? Math.max(0, MAX_QUESTIONS - session.used) : null,
+      voiceInputEnabled: voiceService.enabled && Boolean(storage),
     };
+    res.json({ success: true, data });
+  });
+  app.post('/api/v1/voice/session', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    // FO calls through its same-origin API proxy. Fetch Metadata still describes
+    // that browser request even when the proxy rewrites the upstream Host header.
+    if (
+      ['cross-site', 'same-site'].includes(String(req.headers['sec-fetch-site'])) ||
+      req.headers.origin === 'null'
+    )
+      throw new ChatError(403, 'FORBIDDEN', '다른 사이트에서 음성 입력을 시작할 수 없습니다.');
+    if (
+      !req.is('application/json') ||
+      !req.body ||
+      typeof req.body !== 'object' ||
+      Array.isArray(req.body) ||
+      (req.body.sessionId !== undefined &&
+        (typeof req.body.sessionId !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            req.body.sessionId,
+          )))
+    )
+      throw new ChatError(400, 'INVALID_VOICE_SESSION', '음성 입력을 시작할 대화를 확인해 주세요.');
+    if (!voiceService.enabled)
+      throw new ChatError(
+        503,
+        'VOICE_DISABLED',
+        '음성 입력을 사용할 수 없어요. 직접 입력해 주세요.',
+      );
+    if (!storage)
+      throw new ChatError(
+        503,
+        'VOICE_UNAVAILABLE',
+        '대화 저장소에 연결한 후 음성 입력을 사용할 수 있어요.',
+      );
+    const current = await storage.session(req, res, questionLimitEnabled);
+    const session = req.body.sessionId
+      ? await storage.browserHistory.ownedSession(req, res, req.body.sessionId)
+      : current;
+    if (session.lawOfficeId !== current.lawOfficeId)
+      throw new ChatError(404, 'NOT_FOUND', '대화를 찾을 수 없습니다.');
+    if (questionLimitEnabled && session.questionCount >= MAX_QUESTIONS)
+      throw new ChatError(
+        429,
+        'QUESTION_LIMIT_REACHED',
+        '이번 대화의 질문을 모두 사용했어요. 새 대화를 시작해 주세요.',
+      );
+    const browser = await storage.browserHistory.browser(req, res);
+    const data = await voiceService.createSession(browser.id);
     res.json({ success: true, data });
   });
   app.post('/api/v1/chat/session', async (req, res) => {

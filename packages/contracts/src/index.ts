@@ -123,7 +123,19 @@ export interface PublicConfig {
   maxQuestions: number;
   questionLimitEnabled: boolean;
   remainingQuestions?: number | null;
+  voiceInputEnabled?: boolean;
 }
+
+export interface VoiceSession {
+  clientSecret: string;
+  /** Unix timestamp in seconds; expires the connection credential, not an active session. */
+  expiresAt: number;
+  maxDurationSeconds: number;
+}
+
+export type VoiceSessionResponse =
+  | { success: true; data: VoiceSession }
+  | { success: false; error: { code: string; message: string } };
 
 export interface ChatTurn {
   answerMessageId?: string;

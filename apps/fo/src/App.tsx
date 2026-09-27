@@ -29,6 +29,8 @@ import {
   X,
 } from 'lucide-react';
 import type { ChatResponse, ChatTurn, PublicConfig } from '@lawcheck/contracts';
+import { useVoiceInput } from './useVoiceInput';
+import { VoiceButton, VoiceInput } from './VoiceInput';
 
 const topics = [
   {
@@ -212,6 +214,17 @@ export default function App() {
   const logoOpensSidebar = sidebarCollapsed && !mobileViewport;
   const remaining = Math.max(0, quota - (loading ? 1 : 0));
   const limitReached = config.questionLimitEnabled && remaining === 0;
+  const voiceDisabled = loading || switching || limitReached || !ready || question.length >= 2000;
+  const voice = useVoiceInput({
+    conversationId: currentId,
+    enabled: config.voiceInputEnabled === true,
+    disabled: voiceDisabled,
+    draftLength: question.length + (question ? 1 : 0),
+    onTranscript: (text) => {
+      setQuestion((previous) => (previous.trim() ? `${previous.trimEnd()}\n${text}` : text));
+      requestAnimationFrame(() => composer.current?.focus());
+    },
+  });
   const latestId = turns.at(-1)?.id;
   const latestStatus = turns.at(-1)?.status;
   const unreadCount = (items: Review[]) =>
@@ -349,6 +362,7 @@ export default function App() {
 
   async function newConversation() {
     if (loading || switching || !ready) return;
+    voice.cancel();
     setSwitching(true);
     setError('');
     localDrafts.current.set(currentIdRef.current, turns);
@@ -374,6 +388,7 @@ export default function App() {
       setSidebarOpen(false);
       return;
     }
+    voice.cancel();
     setSwitching(true);
     setError('');
     try {
@@ -397,7 +412,17 @@ export default function App() {
   }
   async function sendQuestion(event: FormEvent) {
     event.preventDefault();
-    if (!question.trim() || activeRequest.current || limitReached || switching || !ready) return;
+    if (
+      !question.trim() ||
+      question.length > 2000 ||
+      voice.busy ||
+      activeRequest.current ||
+      limitReached ||
+      switching ||
+      !ready
+    )
+      return;
+    voice.cancel();
     const text = question.trim();
     const id = crypto.randomUUID();
     const chatId = currentIdRef.current;
@@ -883,6 +908,9 @@ export default function App() {
                 ref={composer}
                 value={question}
                 maxLength={2000}
+                readOnly={voice.busy}
+                aria-invalid={question.length > 2000 || undefined}
+                aria-describedby={question.length > 2000 ? 'question-length-error' : undefined}
                 disabled={loading || switching || limitReached || !ready}
                 rows={2}
                 onChange={(e) => setQuestion(e.target.value)}
@@ -903,6 +931,13 @@ export default function App() {
                   if (!event.repeat) event.currentTarget.form?.requestSubmit();
                 }}
               />
+              {config.voiceInputEnabled && <VoiceInput voice={voice} />}
+              {question.length > 2000 && (
+                <p id="question-length-error" className="voice-length-error" role="alert">
+                  질문은 2,000자까지 보낼 수 있어요. 인식한 내용 {question.length.toLocaleString()}
+                  자를 확인하고 줄여 주세요.
+                </p>
+              )}
               <div className="composer-toolbar">
                 <span className="composer-mode">
                   <img src="/brand/openai.svg" alt="" />
@@ -915,10 +950,21 @@ export default function App() {
                       남은 질문 <b>{remaining}</b> / {config.maxQuestions}
                     </span>
                   )}
+                  {config.voiceInputEnabled && (
+                    <VoiceButton voice={voice} disabled={voiceDisabled} />
+                  )}
                   <button
                     type="submit"
                     className="send-button"
-                    disabled={!question.trim() || loading || switching || limitReached || !ready}
+                    disabled={
+                      !question.trim() ||
+                      question.length > 2000 ||
+                      voice.busy ||
+                      loading ||
+                      switching ||
+                      limitReached ||
+                      !ready
+                    }
                     aria-label="질문 보내기"
                   >
                     <ArrowUp size={21} />
@@ -938,6 +984,7 @@ export default function App() {
                     key={name}
                     className="topic-card"
                     onClick={() => {
+                      voice.cancel();
                       setQuestion(prompt);
                       composer.current?.focus();
                     }}
@@ -1120,6 +1167,10 @@ export default function App() {
               <p>
                 질문과 대화는 AI 답변 생성을 위해 OpenAI에 전달되며 서버에 저장됩니다. 검증 요청 시
                 선택한 질문·답변과 연락 이메일도 저장됩니다.
+              </p>
+              <p>
+                음성 입력을 시작하면 마이크 음성이 문자 인식을 위해 OpenAI로 전송됩니다. 이 서비스는
+                녹음 파일을 저장하지 않으며, 내용을 확인하고 전송한 질문을 대화 기록에 저장합니다.
               </p>
               <p>
                 브라우저 식별 쿠키는 30일 동안 유지됩니다. 쿠키를 삭제하거나 다른 브라우저를
