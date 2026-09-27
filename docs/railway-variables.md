@@ -17,6 +17,7 @@ OPENAI_ANSWER_MODEL=gpt-4.1-mini
 LAW_OFFICE_CODE=LAW001
 LAW_OFFICE_NAME=법률사무소 IBS
 QUESTION_LIMIT_ENABLED=false
+VOICE_INPUT_ENABLED=true
 ```
 
 - `DATABASE_URL`: 현재 API의 DB 기능에 필수입니다. `Postgres`는 실제 Railway DB 서비스 이름으로 바꿉니다.
@@ -24,6 +25,7 @@ QUESTION_LIMIT_ENABLED=false
 - `OPENAI_ANSWER_MODEL`: 현재 코드 기본값은 `gpt-4.1-mini`이며, 사용하는 모델 ID로 지정합니다.
 - `LAW_OFFICE_CODE`, `LAW_OFFICE_NAME`: 사무소 식별 코드와 표시명입니다. 코드 기본값은 각각 `LAW001`, `법률사무소 IBS`입니다.
 - `QUESTION_LIMIT_ENABLED`: `true`이면 대화당 질문 3회 제한, `false`이면 제한 해제입니다.
+- `VOICE_INPUT_ENABLED`: 기본 활성화입니다. `false`이면 FO 마이크 버튼을 숨기고 음성 세션 발급을 중단합니다. 기존 `OPENAI_API_KEY`로 `gpt-live-transcribe`를 사용합니다. [음성 입력 설정과 검증](voice-input.md)을 참고하세요.
 
 최초에는 `ADMIN_EMAIL`을 비워 두고 배포합니다. 이 환경의 BO에서 회원가입한 뒤 API에 아래 값을 추가하고 재배포합니다. 이미 가입한 활성 회원이라면 바로 설정할 수 있습니다.
 

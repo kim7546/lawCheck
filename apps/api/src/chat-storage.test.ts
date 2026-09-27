@@ -38,6 +38,7 @@ test(
       const storage = new ChatStorage(db);
       let release: (() => void) | undefined;
       let entered: (() => void) | undefined;
+      let voiceCalls = 0;
       const app = createApp(
         'Test',
         async ({ question, history }) => {
@@ -52,7 +53,20 @@ test(
           }
           return { answer: `answer:${question}`, isLegalQuestion: question !== 'second' };
         },
-        { storage, questionLimitEnabled: false },
+        {
+          storage,
+          questionLimitEnabled: false,
+          voice: {
+            apiKey: 'voice-test-key',
+            fetch: async () => {
+              voiceCalls++;
+              return Response.json({
+                value: 'ek_test',
+                expires_at: Math.floor(Date.now() / 1000) + 60,
+              });
+            },
+          },
+        },
       );
       const client = request.agent(app);
       const config = await client.get('/api/v1/config').expect(200);
@@ -62,6 +76,27 @@ test(
       assert.ok(sessionCookie, 'config must return a session cookie');
       const cookie = sessionCookie.split(';')[0];
       assert.ok(cookie, 'session cookie must contain a name and value');
+      assert.equal(config.body.data.voiceInputEnabled, true);
+      const beforeVoice = (await client.get('/api/v1/chat/history').expect(200)).body.data;
+      const voiceSession = await client
+        .post('/api/v1/voice/session')
+        .send({ sessionId: beforeVoice.sessionId })
+        .expect(200);
+      assert.equal(voiceSession.headers['cache-control'], 'no-store');
+      assert.equal(voiceSession.body.data.clientSecret, 'ek_test');
+      assert.equal(
+        (await db.chatSession.findUniqueOrThrow({ where: { id: beforeVoice.sessionId } }))
+          .questionCount,
+        0,
+      );
+      assert.equal(await db.chatMessage.count(), 0);
+      await request(app)
+        .post('/api/v1/voice/session')
+        .send({ sessionId: beforeVoice.sessionId })
+        .expect(404);
+      assert.equal(voiceCalls, 1, 'another browser cannot mint a token for this conversation');
+      await client.post('/api/v1/voice/session').send({}).expect(200);
+      assert.equal(voiceCalls, 2);
       await client.post('/api/v1/chat').send({ question: 'first' }).expect(200);
       await client
         .post('/api/v1/chat')

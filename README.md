@@ -27,6 +27,8 @@ npm run dev
 
 ## 현재 구현 범위
 
+FO는 마이크로 질문을 받아쓰고 내용을 확인·수정한 뒤 전송할 수 있습니다. 기존 서버 키로 OpenAI Realtime Transcription을 사용하며, `VOICE_INPUT_ENABLED=false`로 끌 수 있습니다. 설정과 동작 범위는 [음성 입력 안내](docs/voice-input.md)를 참고하세요.
+
 - React + TypeScript + Vite 기반 FO·BO·Admin 별도 앱
 - Node.js + Express API와 공통 TypeScript 계약
 - PostgreSQL Docker Compose, Prisma 스키마·초기 migration·사무실 seed
