@@ -89,7 +89,7 @@ export class ChatStorage {
           sessionId,
           parentMessageId: question.id,
           role: 'ASSISTANT',
-          messageType: answer.isLegalQuestion ? 'AI_ANSWER' : 'NON_LEGAL_NOTICE',
+          messageType: 'AI_ANSWER',
           content: answer.answer,
           sequenceNo: question.sequenceNo + 1,
           processingStatus: 'COMPLETED',

@@ -18,6 +18,7 @@ export function createApp(
   }),
   {
     questionLimitEnabled = process.env.QUESTION_LIMIT_ENABLED === 'true',
+    reviewRequestsEnabled = false,
     storage,
     db,
     voice = {
@@ -26,6 +27,7 @@ export function createApp(
     },
   }: {
     questionLimitEnabled?: boolean;
+    reviewRequestsEnabled?: boolean;
     storage?: ChatStorage;
     db?: PrismaClient;
     voice?: VoiceOptions;
@@ -56,6 +58,7 @@ export function createApp(
       questionLimitEnabled,
       remainingQuestions: questionLimitEnabled ? Math.max(0, MAX_QUESTIONS - session.used) : null,
       voiceInputEnabled: voiceService.enabled && Boolean(storage),
+      reviewRequestsEnabled: reviewRequestsEnabled && Boolean(db && storage),
     };
     res.json({ success: true, data });
   });
@@ -259,6 +262,12 @@ export function createApp(
     } finally {
       session.pending = false;
     }
+  });
+  // New requests stay closed until expert coverage and per-question eligibility are available.
+  app.post('/api/v1/reviews', (_req, _res, next) => {
+    if (!reviewRequestsEnabled)
+      throw new ChatError(503, 'VERIFICATION_UNAVAILABLE', '전문가 검증 서비스를 준비하고 있어요.');
+    next();
   });
   if (db) app.use('/api/v1/admin', adminRouter(db));
   if (db && storage) app.use('/api/v1', reviewBoardRouter(db, storage));

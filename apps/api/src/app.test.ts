@@ -11,7 +11,7 @@ test('development mode allows twelve questions and bounds recent history', async
       undefined,
       async ({ history }) => {
         seen.push(history.length);
-        return { answer: '답변', isLegalQuestion: true };
+        return { answer: '답변' };
       },
       { questionLimitEnabled: false },
     ),
@@ -35,7 +35,7 @@ test('chat forwards question and history and returns generated answer', async ()
   const response = await request(
     createApp(undefined, async (input) => {
       assert.deepEqual(input, { question: '새 질문', history });
-      return { answer: 'GPT 답변', isLegalQuestion: true };
+      return { answer: 'GPT 답변' };
     }),
   )
     .post('/api/v1/chat')
@@ -78,8 +78,14 @@ test('Responses API request keeps credentials server-side and extracts message o
       assert.equal(body.store, false);
       assert.deepEqual(
         body.input.map((item: { role: string }) => item.role),
-        ['developer', 'user', 'assistant', 'user'],
+        ['user', 'assistant', 'user'],
       );
+      assert.doesNotMatch(body.instructions, /법률|변호사|isLegalQuestion/);
+      assert.deepEqual(body.input, [
+        { role: 'user', content: '이전 질문' },
+        { role: 'assistant', content: '이전 답변' },
+        { role: 'user', content: '파스타 만드는 방법을 알려줘' },
+      ]);
       return Response.json({
         status: 'completed',
         output: [
@@ -89,7 +95,9 @@ test('Responses API request keeps credentials server-side and extracts message o
             content: [
               {
                 type: 'output_text',
-                text: JSON.stringify({ answer: '실제 응답', isLegalQuestion: true }),
+                text: JSON.stringify({
+                  answer: '면을 삶고 소스와 함께 볶으세요.\n기호에 맞게 간하세요.',
+                }),
               },
             ],
           },
@@ -98,8 +106,11 @@ test('Responses API request keeps credentials server-side and extracts message o
     },
   });
   assert.deepEqual(
-    await generate({ question: '질문', history: [{ question: '이전 질문', answer: '이전 답변' }] }),
-    { answer: '실제 응답', isLegalQuestion: true },
+    await generate({
+      question: '파스타 만드는 방법을 알려줘',
+      history: [{ question: '이전 질문', answer: '이전 답변' }],
+    }),
+    { answer: '면을 삶고 소스와 함께 볶으세요.\n기호에 맞게 간하세요.' },
   );
 });
 
@@ -204,6 +215,7 @@ test('public config exposes office branding without environment secrets', async 
     questionLimitEnabled: false,
     remainingQuestions: null,
     voiceInputEnabled: false,
+    reviewRequestsEnabled: false,
   });
 });
 test('prototype cannot accidentally accept or send real verification requests', async () => {
@@ -211,6 +223,14 @@ test('prototype cannot accidentally accept or send real verification requests', 
     .post('/api/v1/verification-requests')
     .send({ email: 'test@example.com' });
   assert.equal(response.status, 404);
+  const unavailable = await request(createApp()).post('/api/v1/reviews').send({
+    answerMessageId: '00000000-0000-4000-8000-000000000001',
+    email: 'test@example.com',
+    consent: true,
+    reviewRequestsEnabled: true,
+  });
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.body.error.code, 'VERIFICATION_UNAVAILABLE');
 });
 
 test('server limits a cookie session to three questions even when history is omitted; reset starts a new session', async () => {
@@ -220,7 +240,7 @@ test('server limits a cookie session to three questions even when history is omi
       undefined,
       async () => {
         calls++;
-        return { answer: '법률 질문을 입력해 주세요.', isLegalQuestion: false };
+        return { answer: '안녕하세요. 무엇을 도와드릴까요?' };
       },
       { questionLimitEnabled: true },
     ),
@@ -229,7 +249,7 @@ test('server limits a cookie session to three questions even when history is omi
     const response = await client.post('/api/v1/chat').send({ question: '안녕하세요' });
     assert.equal(response.status, 200);
     assert.equal(response.body.data.remainingQuestions, 2 - index);
-    assert.equal(response.body.data.isLegalQuestion, false);
+    assert.equal(response.body.data.answer, '안녕하세요. 무엇을 도와드릴까요?');
   }
   assert.equal((await client.get('/api/v1/config')).body.data.remainingQuestions, 0);
   const blocked = await client.post('/api/v1/chat').send({ question: '네 번째' });
@@ -272,12 +292,17 @@ test('pending requests cannot race the session counter and failures refund the q
   assert.equal((await client.get('/api/v1/config')).body.data.remainingQuestions, 3);
 });
 
-test('structured answers preserve classification and reject missing or malformed classification', async () => {
+test('structured answers accept every topic without classification and reject invalid answer text', async () => {
   for (const data of [
-    { answer: '법률 안내', isLegalQuestion: true },
-    { answer: '법률 질문을 해 주세요.', isLegalQuestion: false },
-    { answer: '분류 없음' },
-    { answer: '잘못된 분류', isLegalQuestion: 'true' },
+    { answer: '요리 답변\n다음 단계' },
+    { answer: '번역 답변' },
+    { answer: '코딩 답변' },
+    { answer: '법률 답변' },
+    {},
+    { answer: '' },
+    { answer: '   ' },
+    { answer: false },
+    null,
   ]) {
     const generate = createAnswerGenerator({
       apiKey: 'test-key',
@@ -285,6 +310,8 @@ test('structured answers preserve classification and reject missing or malformed
         const payload = JSON.parse(init?.body as string);
         assert.equal(payload.text.format.type, 'json_schema');
         assert.equal(payload.text.format.strict, true);
+        assert.deepEqual(payload.text.format.schema.required, ['answer']);
+        assert.deepEqual(Object.keys(payload.text.format.schema.properties), ['answer']);
         return Response.json({
           status: 'completed',
           output: [
@@ -293,7 +320,7 @@ test('structured answers preserve classification and reject missing or malformed
         });
       },
     });
-    if (typeof data.isLegalQuestion === 'boolean') {
+    if (typeof data?.answer === 'string' && data.answer.trim()) {
       assert.deepEqual(await generate({ question: '질문', history: [] }), data);
     } else {
       await assert.rejects(generate({ question: '질문', history: [] }), {
@@ -301,4 +328,23 @@ test('structured answers preserve classification and reject missing or malformed
       });
     }
   }
+});
+
+test('provider refusal text is returned without requiring a classification or JSON envelope', async () => {
+  const generate = createAnswerGenerator({
+    apiKey: 'test-key',
+    fetch: async () =>
+      Response.json({
+        status: 'completed',
+        output: [
+          {
+            type: 'message',
+            content: [{ type: 'refusal', refusal: '이 요청에는 답할 수 없습니다.' }],
+          },
+        ],
+      }),
+  });
+  assert.deepEqual(await generate({ question: '질문', history: [] }), {
+    answer: '이 요청에는 답할 수 없습니다.',
+  });
 });

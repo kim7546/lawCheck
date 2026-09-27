@@ -124,6 +124,7 @@ export interface PublicConfig {
   questionLimitEnabled: boolean;
   remainingQuestions?: number | null;
   voiceInputEnabled?: boolean;
+  reviewRequestsEnabled?: boolean;
 }
 
 export interface VoiceSession {
@@ -143,7 +144,6 @@ export interface ChatTurn {
   question: string;
   answer: string;
   requested: boolean;
-  isLegalQuestion?: boolean;
   status?: 'pending' | 'complete' | 'error';
 }
 
@@ -154,7 +154,6 @@ export interface ChatRequest {
 
 export interface ChatAnswer {
   answer: string;
-  isLegalQuestion: boolean;
 }
 
 export type ChatResponse =

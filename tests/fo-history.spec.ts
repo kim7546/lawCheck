@@ -77,7 +77,6 @@ test('brand logo starts a new conversation, preserves history and keeps review n
       });
       data = {
         answer: `AI 답변: ${body.question}`,
-        isLegalQuestion: true,
         sessionId: body.sessionId,
         answerMessageId: messages.at(-1)?.id,
       };
@@ -101,7 +100,9 @@ test('brand logo starts a new conversation, preserves history and keeps review n
   await draft.fill('새 대화로 이동하면 지울 작성 중 질문');
   if (isMobile) await page.getByRole('button', { name: '대화 메뉴 열기', exact: true }).click();
   await page.locator('.brand-logo').click();
-  await expect(page.getByRole('heading', { name: /법률이 궁금할 때/ })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: '무엇이든 물어보세요', exact: true }),
+  ).toBeVisible();
   await expect(page.locator('.assistant-body')).toHaveCount(0);
   await expect(draft).toHaveValue('');
   await expect(draft).toBeFocused();
@@ -111,6 +112,8 @@ test('brand logo starts a new conversation, preserves history and keeps review n
   await expect(page.locator('.assistant-body > p')).toContainText('퇴직금을 계산');
   await page.reload();
   await expect(page.locator('.assistant-body > p')).toContainText('퇴직금을 계산');
+  await expect(page.locator('.answer-ad-slot')).toHaveCount(0);
+  await expect(page.locator('.verify-button')).toHaveCount(0);
   const menu = page.getByRole('button', { name: '대화 메뉴 열기' });
   if (await menu.isVisible()) await menu.click();
   await expect(page.locator('.history-row')).toHaveCount(2);

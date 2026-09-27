@@ -97,7 +97,6 @@ export async function mockVoice(
       data = {
         sessionId: currentId,
         answer: '계약서와 입금 내역을 확인해 주세요.',
-        isLegalQuestion: true,
         answerMessageId: answerId,
       };
     }

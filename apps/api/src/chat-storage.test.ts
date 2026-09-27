@@ -51,7 +51,7 @@ test(
               release = resolve;
             });
           }
-          return { answer: `answer:${question}`, isLegalQuestion: question !== 'second' };
+          return { answer: `answer:${question}` };
         },
         {
           storage,
@@ -107,7 +107,9 @@ test(
       const [firstQuestion, firstAnswer, secondQuestion, secondAnswer] = messages;
       assert.ok(firstQuestion && firstAnswer && secondQuestion && secondAnswer);
       assert.equal(firstAnswer.parentMessageId, firstQuestion.id);
-      assert.equal(secondAnswer.messageType, 'NON_LEGAL_NOTICE');
+      assert.equal(firstAnswer.messageType, 'AI_ANSWER');
+      assert.equal(secondAnswer.messageType, 'AI_ANSWER');
+      assert.equal(secondAnswer.content, 'answer:second');
       assert.equal(new Set(messages.map((m) => m.sessionId)).size, 1);
       const session = await db.chatSession.findUniqueOrThrow({
         where: { id: firstQuestion.sessionId },
@@ -161,11 +163,21 @@ test(
       assert.equal(await db.chatMessage.count({ where: { content: 'answer:reject-save' } }), 0);
 
       // Exercise the initial BO release against the same isolated PostgreSQL database.
-      const reviewApp = createApp(
-        'Test',
-        async () => ({ answer: '검증할 AI 답변', isLegalQuestion: true }),
-        { storage, db },
+      const closedReviews = request.agent(createApp('Test', undefined, { storage, db }));
+      assert.equal(
+        (await closedReviews.get('/api/v1/config')).body.data.reviewRequestsEnabled,
+        false,
       );
+      await closedReviews
+        .post('/api/v1/reviews')
+        .send({ answerMessageId: firstAnswer.id, email: 'test@example.com', consent: true })
+        .expect(503);
+      assert.equal(await db.reviewBoardPost.count(), 0);
+      const reviewApp = createApp('Test', async () => ({ answer: '검증할 AI 답변' }), {
+        storage,
+        db,
+        reviewRequestsEnabled: true,
+      });
       const requester = request.agent(reviewApp);
       const expert = request.agent(reviewApp);
       const otherExpert = request.agent(reviewApp);
@@ -613,7 +625,7 @@ test(
       assert.deepEqual(await db.expertAccount.findUnique({ where: { id: legacy.id } }), legacy);
       assert.equal(await db.expertConsent.count({ where: { accountId: legacy.id } }), 0);
       // A separate app isolates signup rate limiting from the preceding scenario.
-      const signupApp = createApp('Test', async () => ({ answer: '', isLegalQuestion: true }), {
+      const signupApp = createApp('Test', async () => ({ answer: '' }), {
         storage,
         db,
       });
@@ -669,7 +681,7 @@ test(
         'DROP TRIGGER test_consent ON expert_consents; DROP FUNCTION reject_test_consent();',
       );
       // Common-code management is explicitly privileged, with no signup privilege escalation.
-      const codeFlowApp = createApp('Test', async () => ({ answer: '', isLegalQuestion: true }), {
+      const codeFlowApp = createApp('Test', async () => ({ answer: '' }), {
         storage,
         db,
       });
@@ -823,7 +835,7 @@ test(
         data: { canManageCodes: false },
       });
       await expert.get('/api/v1/bo/code-groups').expect(403);
-      const lawyerApp = createApp('Test', async () => ({ answer: '', isLegalQuestion: true }), {
+      const lawyerApp = createApp('Test', async () => ({ answer: '' }), {
         storage,
         db,
       });

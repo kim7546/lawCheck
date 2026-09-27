@@ -11,14 +11,13 @@ import {
   ArrowUp,
   ArrowRight,
   Bell,
+  BookOpen,
   Check,
   ChevronDown,
   CircleHelp,
   FileCheck2,
-  House,
-  BriefcaseBusiness,
-  Landmark,
-  HeartHandshake,
+  Languages,
+  Lightbulb,
   Menu,
   MessageCircle,
   PanelLeftClose,
@@ -32,28 +31,29 @@ import type { ChatResponse, ChatTurn, PublicConfig } from '@lawcheck/contracts';
 import { useVoiceInput } from './useVoiceInput';
 import { VoiceButton, VoiceInput } from './VoiceInput';
 
-const topics = [
+const questionTemplates = [
   {
-    name: '부동산·임대차',
-    icon: House,
-    prompt: '계약이 끝났는데 집주인이 보증금을 돌려주지 않아요.',
+    name: '글쓰기',
+    icon: SquarePen,
+    prompt: '감사 인사를 전하는 정중한 이메일 초안을 작성해 줘.',
   },
   {
-    name: '노동·직장',
-    icon: BriefcaseBusiness,
-    prompt: '퇴사한 지 한 달이 지났는데 아직 급여를 받지 못했어요.',
+    name: '번역',
+    icon: Languages,
+    prompt: "'도와주셔서 감사합니다. 좋은 하루 보내세요.'를 자연스러운 영어로 번역해 줘.",
   },
   {
-    name: '민사·금전',
-    icon: Landmark,
-    prompt: '지인에게 빌려준 돈을 돌려받으려면 무엇부터 준비해야 하나요?',
+    name: '학습',
+    icon: BookOpen,
+    prompt: '새로운 개념을 쉽게 이해하는 공부 방법과 일주일 학습 계획을 알려줘.',
   },
   {
-    name: '가사·생활',
-    icon: HeartHandshake,
-    prompt: '상속과 관련해 가족끼리 의견이 다른데 어떻게 정리해야 할까요?',
+    name: '아이디어',
+    icon: Lightbulb,
+    prompt: '일상에서 실천할 수 있는 창의적인 취미 아이디어 5가지를 추천해 줘.',
   },
 ];
+
 type Conversation = { id: string; title: string; updatedAt: string };
 type Review = {
   id: string;
@@ -119,7 +119,6 @@ function restoreTurns(history: History): ChatTurn[] {
             ? '답변을 생성하고 있습니다. 잠시 후 대화를 다시 열어 주세요.'
             : '완료된 AI 답변이 없습니다. 다시 질문해 주세요.'),
         answerMessageId: answer?.id,
-        isLegalQuestion: answer?.messageType === 'AI_ANSWER',
         requested: false,
         status: answer ? 'complete' : 'error',
       };
@@ -474,7 +473,6 @@ export default function App() {
                 ...turn,
                 answer: body.data.answer,
                 answerMessageId: body.data.answerMessageId,
-                isLegalQuestion: body.data.isLegalQuestion === true,
                 status: 'complete',
               }
             : turn,
@@ -564,6 +562,7 @@ export default function App() {
     }
   }
   function openVerification(turn: ChatTurn) {
+    if (!config.reviewRequestsEnabled) return;
     setSelectedTurn(turn);
     setEmail('');
     setConsent(false);
@@ -572,7 +571,7 @@ export default function App() {
   }
   async function submitVerification(event: FormEvent) {
     event.preventDefault();
-    if (!selectedTurn || !consent || submitting) return;
+    if (!config.reviewRequestsEnabled || !selectedTurn || !consent || submitting) return;
     setSubmitting(true);
     setVerificationError('');
     try {
@@ -824,15 +823,7 @@ export default function App() {
             )}
             {!turns.length ? (
               <section className="hero">
-                <h1>
-                  <span>법률이 궁금할 때,</span>
-                  <span className="hero-question">AI에게 물어보세요.</span>
-                  <strong className="hero-verification">변호사가 검증해드립니다.</strong>
-                </h1>
-                <p>
-                  법률 고민은 AI와 먼저 정리하고,
-                  <br /> 원하는 답변은 변호사에게 검증을 요청하세요.
-                </p>
+                <h1>무엇이든 물어보세요</h1>
               </section>
             ) : (
               <section className="conversation" aria-label="AI 대화" aria-live="polite">
@@ -878,7 +869,7 @@ export default function App() {
                               turn.answer
                             )}
                           </p>
-                          {turn.status === 'complete' && turn.isLegalQuestion === true && (
+                          {turn.status === 'complete' && config.reviewRequestsEnabled && (
                             <button
                               className={`verify-button ${requested ? 'requested' : ''}`}
                               onClick={() =>
@@ -972,31 +963,35 @@ export default function App() {
                 </div>
               </div>
             </form>
-            <p className="composer-notice">
-              AI 답변은 정확하지 않을 수 있어요. 중요한 내용은 전문가의 검증을 받아보세요.
-            </p>
-          </section>
-          {!turns.length && (
-            <>
-              <div className="topic-grid">
-                {topics.map(({ name, icon: Icon, prompt }) => (
+            {!turns.length && (
+              <div className="topic-grid" role="group" aria-label="질문 템플릿">
+                {questionTemplates.map(({ name, icon: Icon, prompt }) => (
                   <button
+                    type="button"
                     key={name}
                     className="topic-card"
+                    disabled={loading || switching || limitReached || !ready}
                     onClick={() => {
                       voice.cancel();
                       setQuestion(prompt);
                       composer.current?.focus();
                     }}
                   >
-                    <Icon size={16} />
-                    {name}
+                    <Icon size={16} aria-hidden="true" />
+                    <span>{name}</span>
                   </button>
                 ))}
               </div>
-              <div className="content-ad-slot" aria-hidden="true" />
-            </>
-          )}
+            )}
+            <p className="composer-notice">
+              AI 답변은 정확하지 않을 수 있어요. 중요한 내용은 다시 확인해 주세요.
+            </p>
+            {!turns.length && (
+              <aside className="content-ad-slot" aria-label="광고">
+                <span className="ad-label">ad</span>
+              </aside>
+            )}
+          </section>
         </main>
       </div>
       {resultScope && (
@@ -1025,7 +1020,7 @@ export default function App() {
               <div className="results-empty">
                 <FileCheck2 size={34} />
                 <h3>아직 검증 요청이 없어요.</h3>
-                <p>AI 답변 아래에서 전문가에게 검증을 요청해 보세요.</p>
+                <p>기존에 요청한 검증 답변은 이곳에서 확인할 수 있어요.</p>
               </div>
             )}
             {scopedReviews.map((review) => (
@@ -1136,22 +1131,22 @@ export default function App() {
       )}
       {info && (
         <Dialog
-          title={info === 'guide' ? '전문가 검증, 이렇게 진행돼요' : '개인정보 안내'}
+          title={info === 'guide' ? '무료 AI 이용 방법' : '개인정보 안내'}
           onClose={() => setInfo(null)}
         >
           {info === 'guide' ? (
             <ol className="guide-steps">
               <li>
                 <strong>AI에게 질문하세요.</strong>
-                <p>대화는 왼쪽 이력에 저장되어 다시 이어갈 수 있어요.</p>
+                <p>궁금한 내용을 입력하고 전송하면 무료로 AI 답변을 받을 수 있어요.</p>
               </li>
               <li>
-                <strong>필요한 답변을 검증 요청하세요.</strong>
-                <p>AI 답변 아래 버튼으로 전문가의 의견을 받아보세요.</p>
+                <strong>대화를 이어가세요.</strong>
+                <p>답변에서 더 궁금한 점을 추가로 물어보세요.</p>
               </li>
               <li>
-                <strong>빨간 숫자를 확인하세요.</strong>
-                <p>새 검증 답변이 도착하면 알려드려요. 여러 의견을 비교하고 하나를 선택하세요.</p>
+                <strong>이전 대화를 다시 확인하세요.</strong>
+                <p>같은 브라우저에서 왼쪽 대화 이력을 열어 대화를 이어갈 수 있어요.</p>
               </li>
             </ol>
           ) : (

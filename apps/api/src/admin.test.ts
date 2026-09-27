@@ -71,11 +71,10 @@ test(
         },
       });
       await db.lawOffice.create({ data: { code: 'LAW001', name: 'Test' } });
-      const app = createApp(
-        'Test',
-        async () => ({ answer: '검증 대상 답변', isLegalQuestion: true }),
-        { db, storage: new ChatStorage(db) },
-      );
+      const app = createApp('Test', async () => ({ answer: '검증 대상 답변' }), {
+        db,
+        storage: new ChatStorage(db),
+      });
       const admin = request.agent(app);
       const dual = request.agent(app);
       const expert = request.agent(app);

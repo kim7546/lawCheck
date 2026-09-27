@@ -40,9 +40,10 @@ test('voice previews speech, reconciles final text and only sends after user rev
     '계약서와 입금 내역을 확인해 주세요.',
   );
   expect(calls.questions[0]?.question).toBe('보증금 5,000만 원을 돌려받지 못했어요.');
-  await expect(page.getByRole('button', { name: /검증 요청/ }).first()).toBeVisible();
+  await expect(page.locator('.verify-button')).toBeHidden();
   await page.reload();
   await expect(page.locator('.user-message')).toContainText('보증금 5,000만 원');
+  await expect(page.locator('.verify-button')).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
