@@ -941,7 +941,7 @@ export default function App() {
               <div className="composer-toolbar">
                 <span className="composer-mode">
                   <img src="/brand/openai.svg" alt="" />
-                  AI 답변
+                  GPT-6-SOL
                   <ChevronDown size={13} />
                 </span>
                 <div className="composer-actions">
