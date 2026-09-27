@@ -594,24 +594,9 @@ p {
 }
 .content-ad-slot {
   width: min(520px, calc(100% - 48px));
-  position: relative;
+  aspect-ratio: 800 / 175;
   margin: 28px auto 0;
-  opacity: 0.85;
   flex-shrink: 0;
-}
-.content-ad-slot > span {
-  position: absolute;
-  font-size: 8px;
-  top: -14px;
-  left: 2px;
-  color: #b8bdc5;
-  letter-spacing: 1px;
-}
-.content-ad-slot img {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 7px;
 }
 .conversation {
   width: 100%;

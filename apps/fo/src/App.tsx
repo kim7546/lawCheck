@@ -994,15 +994,7 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <section className="content-ad-slot" aria-label="광고 영역">
-                <span>AD</span>
-                <img
-                  src="/ads/legal-service-banner.png"
-                  alt="광고: 어려운 법률문제, 박종학 변호사와 함께 해결해보세요. 전화 02-862-9905"
-                  width={800}
-                  height={175}
-                />
-              </section>
+              <div className="content-ad-slot" aria-hidden="true" />
             </>
           )}
         </main>
