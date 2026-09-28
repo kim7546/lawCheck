@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { searchIndexing } from '../../packages/config/search-indexing';
 
 // Deployment settings use runtime variables, independently of the local dev config.
 const apiTarget = process.env.API_PROXY_TARGET?.trim();
@@ -11,6 +12,7 @@ const allowedHosts = [
   .filter(Boolean);
 
 export default defineConfig({
+  plugins: [searchIndexing()],
   preview: {
     host: '0.0.0.0',
     port: Number(process.env.PORT ?? 4173),

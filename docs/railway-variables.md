@@ -49,6 +49,7 @@ API 서비스의 Settings → Networking → Custom Domain에 `api.aiqaver.com`�
 NODE_ENV=production
 PORT=4175
 API_PROXY_TARGET=https://api.aiqaver.com
+SEARCH_ENGINE_INDEXING_ENABLED=false
 ```
 
 `API_PROXY_TARGET`은 API의 origin이며 `/api`나 `/api/v1`을 붙이지 않습니다.
@@ -65,6 +66,7 @@ Config File은 [apps/admin/railway.json](../apps/admin/railway.json), Root Direc
 NODE_ENV=production
 PORT=4174
 API_PROXY_TARGET=https://api.aiqaver.com
+SEARCH_ENGINE_INDEXING_ENABLED=false
 ```
 
 `office.aiqaver.com`은 기본 허용 호스트입니다. 다른 커스텀 도메인을 쓰면 `PREVIEW_ALLOWED_HOSTS=추가도메인`을 설정합니다. BO에는 별도의 관리자 이메일이나 DB 연결값을 넣지 않습니다.
@@ -77,6 +79,7 @@ API_PROXY_TARGET=https://api.aiqaver.com
 NODE_ENV=production
 PORT=4173
 API_PROXY_TARGET=https://api.aiqaver.com
+SEARCH_ENGINE_INDEXING_ENABLED=false
 ```
 
 운영 커스텀 도메인을 사용하면 다음 값도 추가합니다. 개발 환경의 커스텀 도메인이 있다면 해당 호스트명으로 바꿉니다.
@@ -87,6 +90,7 @@ PREVIEW_ALLOWED_HOSTS=aiqaver.com,www.aiqaver.com
 
 ## 공통 규칙과 적용 순서
 
+- FO·BO·Admin은 `SEARCH_ENGINE_INDEXING_ENABLED=false`가 기본값입니다. 미설정·빈 값·오타도 검색 색인을 차단합니다. 허용할 서비스만 `true`로 바꾸고 같은 값으로 **빌드·실행하도록 재배포**합니다. 실행 환경변수만 바꾸면 빌드된 HTML의 차단 태그는 남으므로 반드시 재빌드합니다. [검색엔진 노출 설정](search-indexing.md)을 참고하세요.
 - Admin·BO·FO의 `API_PROXY_TARGET`은 같은 환경의 공통 API를 가리킵니다. DB 연결과 AI 키, `ADMIN_EMAIL`은 API에만 설정합니다.
 - Railway 공개 도메인은 Networking에서 생성합니다. `RAILWAY_PUBLIC_DOMAIN`은 Railway가 제공하므로 직접 추가할 필요가 없습니다. 이 도메인은 세 화면의 preview 설정에서 자동 허용합니다.
 - `PREVIEW_ALLOWED_HOSTS`는 추가 커스텀 호스트명을 쉼표로 구분합니다. `https://`, 경로, 포트는 넣지 않습니다.

@@ -73,6 +73,8 @@ FO·BO·Admin의 로컬 개발 설정은 각 앱의 `vite.config.ts`, 배포 확
 배포용 공통 API 주소는 `https://api.aiqaver.com`입니다. Admin·BO·FO에 `API_PROXY_TARGET=https://api.aiqaver.com`을 지정하고, 별도 개발 환경은 해당 API origin을 사용합니다. 미설정 시 로컬 API로 연결하지 않습니다. 도메인 연결은 [Railway 배포 안내](docs/railway-deployment.md)를 참조하세요.
 실행 명령과 환경변수는 [Railway 배포 안내](docs/railway-deployment.md)를 참고하세요.
 
+FO·BO·Admin은 기본적으로 검색엔진 색인을 차단합니다. `SEARCH_ENGINE_INDEXING_ENABLED=false` 또는 미설정 시 `noindex, nofollow`를 적용합니다. 검색을 허용하려면 해당 서비스의 값을 `true`로 바꾸고 **재빌드·재배포**합니다. 로컬에서는 루트 `.env`에 설정한 뒤 개발 서버를 재시작합니다. 앱별 설정과 확인 방법은 [검색엔진 노출 설정](docs/search-indexing.md)을 참고하세요.
+
 API의 로컬 설정은 `apps/api/src/server.config.ts`, Railway 배포 설정은 `apps/api/src/server.deploy.config.ts`입니다. API 서비스에서 `/apps/api/railway.json`을 Config File로 지정하고 저장소 루트에서 빌드·실행합니다. `npm run start -w @lawcheck/api`는 배포 진입 파일로 실행하여 `0.0.0.0:$PORT`에 바인딩하며 로컬 `.env`를 읽지 않습니다. IntelliJ 디버그는 기존 `apps/api/src/server.ts`를 그대로 사용합니다.
 
 ## 데이터베이스 준비
@@ -97,6 +99,7 @@ npm run lint
 npm test
 npm run build
 npm run test:e2e
+npm run test:search-indexing
 ```
 
 Playwright 테스트는 Windows에 설치된 Microsoft Edge를 사용합니다. 다른 환경에서는 `playwright.config.ts`의 `channel`을 제거하고 `npx playwright install chromium`을 실행하세요. 데스크톱과 모바일 크기에서 질문·검증 체험·대화 초기화·API 요청·실패 후 재시도를 검사합니다.

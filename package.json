@@ -21,6 +21,7 @@
     "test": "npm run test -w @lawcheck/api",
     "test:e2e": "playwright test",
     "test:admin-service": "npm run build -w @lawcheck/admin && node scripts/test-admin-service.mjs",
+    "test:search-indexing": "node scripts/test-search-indexing.mjs",
     "db:generate": "npm run db:generate -w @lawcheck/api",
     "codes:admin": "node apps/api/prisma/code-admin.mjs",
     "admin:account": "node apps/api/prisma/admin-account.mjs",
