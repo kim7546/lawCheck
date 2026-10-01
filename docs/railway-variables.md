@@ -82,11 +82,13 @@ API_PROXY_TARGET=https://api.aiqaver.com
 SEARCH_ENGINE_INDEXING_ENABLED=false
 ```
 
-운영 커스텀 도메인을 사용하면 다음 값도 추가합니다. 개발 환경의 커스텀 도메인이 있다면 해당 호스트명으로 바꿉니다.
+`search.aiqaver.com`과 `lawcheckfo-production.up.railway.app`은 기본 허용 호스트입니다. 다른 커스텀 도메인을 추가로 사용하면 다음 값도 설정합니다. 개발 환경의 커스텀 도메인이 있다면 해당 호스트명으로 바꿉니다.
 
 ```dotenv
 PREVIEW_ALLOWED_HOSTS=aiqaver.com,www.aiqaver.com
 ```
+
+`Blocked request. This host (...) is not allowed.`가 표시되면 FO 서비스의 `PREVIEW_ALLOWED_HOSTS`에 오류에 나온 호스트명을 추가하고 재배포합니다. 예: `PREVIEW_ALLOWED_HOSTS=search.aiqaver.com`. 기존 목록이 있으면 쉼표로 추가합니다. 시작 명령은 `npm run preview -w @lawcheck/fo`이어야 `vite.preview.config.ts`의 설정을 읽습니다.
 
 ## 공통 규칙과 적용 순서
 

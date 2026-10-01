@@ -4,6 +4,7 @@ import { searchIndexing } from '../../packages/config/search-indexing';
 // Deployment settings use runtime variables, independently of the local dev config.
 const apiTarget = process.env.API_PROXY_TARGET?.trim();
 const allowedHosts = [
+  'search.aiqaver.com',
   'lawcheckfo-production.up.railway.app',
   process.env.RAILWAY_PUBLIC_DOMAIN ?? '',
   ...(process.env.PREVIEW_ALLOWED_HOSTS ?? '').split(','),

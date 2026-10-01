@@ -13,7 +13,7 @@ FO·BO·Admin은 각각 개발용 `vite.config.ts`와 배포 확인용 `vite.pre
 | 허용 도메인 | 로컬 호스트                    | `RAILWAY_PUBLIC_DOMAIN`, `PREVIEW_ALLOWED_HOSTS`  |
 
 배포 설정은 실행 프로세스의 환경변수를 읽습니다. 루트의 개발용 `.env`는 읽지 않습니다.
-기존 FO 도메인 `lawcheckfo-production.up.railway.app`도 명시적으로 허용합니다.
+FO는 `search.aiqaver.com`과 `lawcheckfo-production.up.railway.app`을 기본으로 허용합니다.
 BO는 `office.aiqaver.com`과 `lawcheckbo-production.up.railway.app`을 기본으로 허용합니다.
 
 FO·BO·Admin은 검색엔진 색인을 기본 차단합니다. 각 서비스의 `SEARCH_ENGINE_INDEXING_ENABLED=true`로 검색을 허용할 수 있으며, 변경 후에는 같은 환경변수로 **재빌드·재배포**해야 HTML 태그와 응답 헤더가 함께 바뀝니다. 상세 내용은 [검색엔진 노출 설정](search-indexing.md)을 참고하세요. FO·BO의 Railway Watch Paths를 별도로 제한했다면 공통 설정인 `/packages/config/**`도 포함하세요. Admin 설정에는 반영되어 있습니다.
