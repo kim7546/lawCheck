@@ -167,3 +167,42 @@ export type ChatResponse =
       };
     }
   | { success: false; error: { code: string; message: string } };
+
+export type AnswerEmailStatus = 'QUEUED' | 'SENDING' | 'RETRY' | 'SENT' | 'FAILED';
+export interface AdminEmail {
+  id: string;
+  contributionId: string;
+  recipient: string;
+  subject: string;
+  status: AnswerEmailStatus;
+  attemptCount: number;
+  version: number;
+  lastErrorCode: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  nextAttemptAt: string;
+}
+export interface AdminEmailDetail extends AdminEmail {
+  body: string;
+  linkExpiresAt: string;
+  attempts: {
+    id: string;
+    attemptNo: number;
+    status: AnswerEmailStatus;
+    errorCode: string | null;
+    startedAt: string;
+    finishedAt: string | null;
+  }[];
+}
+export interface AdminEmailsPage {
+  items: AdminEmail[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+export interface LinkedReviewAnswer {
+  question: string;
+  reply: string;
+  author: string;
+  completedAt: string;
+}

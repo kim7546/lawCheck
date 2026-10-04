@@ -1270,3 +1270,17 @@ dialog::backdrop {
     animation: none;
   }
 }
+
+.linked-answer {
+  max-width: 860px;
+  margin: 40px auto;
+  padding: 24px;
+}
+.linked-answer p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+.linked-answer h2 {
+  margin-top: 32px;
+}

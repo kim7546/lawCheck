@@ -281,6 +281,7 @@ model ReviewContribution {
   expert ExpertAccount @relation(fields: [expertId], references: [id], onDelete: Restrict)
   choices ReviewChoice[]
   reads FoReviewRead[]
+  emailDelivery AnswerEmailDelivery?
   @@unique([postId, expertId])
   @@unique([postId, id])
   @@index([expertId, status])
@@ -962,4 +963,50 @@ model AuditLog {
   @@index([lawOfficeId, entityType, entityId, createdAt])
   @@index([lawOfficeId, actorType, actorId, createdAt])
   @@map("audit_logs")
+}
+
+/// 전문가 답변 알림: 답변 완료와 동일 트랜잭션으로 등록하는 발송 이력/대기열
+model AnswerEmailDelivery {
+  id String @id @default(uuid()) @db.Uuid
+  contributionId String @unique @map("contribution_id") @db.Uuid
+  recipient String @db.VarChar(254)
+  subject String @db.VarChar(200)
+  body String @db.Text
+  linkTokenHash String @unique @map("link_token_hash") @db.VarChar(64)
+  linkExpiresAt DateTime @map("link_expires_at") @db.Timestamptz(3)
+  status AnswerEmailStatus @default(QUEUED)
+  attemptCount Int @default(0) @map("attempt_count")
+  retryCount Int @default(0) @map("retry_count")
+  version Int @default(1)
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+  lastErrorCode String? @map("last_error_code") @db.VarChar(100)
+  sentAt DateTime? @map("sent_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  contribution ReviewContribution @relation(fields: [contributionId], references: [id], onDelete: Restrict)
+  attempts AnswerEmailAttempt[]
+  @@index([status, nextAttemptAt, leaseUntil])
+  @@index([createdAt, id])
+  @@map("answer_email_deliveries")
+}
+
+model AnswerEmailAttempt {
+  id String @id @default(uuid()) @db.Uuid
+  deliveryId String @map("delivery_id") @db.Uuid
+  attemptNo Int @map("attempt_no")
+  status AnswerEmailStatus @default(SENDING)
+  errorCode String? @map("error_code") @db.VarChar(100)
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
+  delivery AnswerEmailDelivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  @@unique([deliveryId, attemptNo])
+  @@map("answer_email_attempts")
+}
+
+enum AnswerEmailStatus {
+  QUEUED
+  SENDING
+  RETRY
+  SENT
+  FAILED
 }

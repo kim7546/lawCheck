@@ -5,6 +5,7 @@ import {
   ListTree,
   LogOut,
   MessageSquare,
+  Mail,
   Settings2,
   ShieldCheck,
   Users,
@@ -12,6 +13,7 @@ import {
 import type { AdminIdentity } from '@lawcheck/contracts';
 import { CommonCodes } from '@lawcheck/ui/common-codes';
 import { adminApi, AdminApiError } from './api';
+import { AdminEmails } from './AdminEmails';
 import { AdminOverview } from './AdminOverview';
 import { AdminUsers } from './AdminUsers';
 import { AdminMenus } from './AdminMenus';
@@ -33,6 +35,11 @@ const sections = {
     title: '통계',
     description: '접수된 질문을 주제별로 모아 건수와 비중을 확인합니다.',
     icon: BarChart3,
+  },
+  emails: {
+    title: '이메일 발송이력',
+    description: '답변 알림의 발송 상태, 본문과 시도별 결과를 확인합니다.',
+    icon: Mail,
   },
   users: {
     title: '사용자 관리',
@@ -231,6 +238,8 @@ export default function AdminApp() {
             <AdminQuestions onError={onSessionError} />
           ) : section === 'statistics' ? (
             <AdminQuestionStatistics onError={onSessionError} />
+          ) : section === 'emails' ? (
+            <AdminEmails onError={onSessionError} />
           ) : section === 'users' ? (
             <AdminUsers selfId={user.id} onError={onSessionError} onSelfUpdate={setUser} />
           ) : section === 'menus' ? (

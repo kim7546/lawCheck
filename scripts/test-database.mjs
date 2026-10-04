@@ -113,7 +113,7 @@ try {
   const tables = await db.query(
     "SELECT count(*)::int AS count FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'",
   );
-  assert.equal(tables.rows[0].count, 33);
+  assert.equal(tables.rows[0].count, 35);
   for (const snapshot of renameSnapshots.filter(({ table }) =>
     [
       'expert_accounts',
@@ -251,6 +251,24 @@ try {
     (await db.query('SELECT count(*)::int AS count FROM review_choices')).rows[0].count,
     1,
   );
+  // A completed answer may have one notification; invalid references and retry counts are rejected.
+  await db.exec(`INSERT INTO answer_email_deliveries(id,contribution_id,recipient,subject,body,link_token_hash,link_expires_at)
+    SELECT '00000000-0000-4000-8000-000000000030',id,'reader@example.com','Answer','Full reply',repeat('f',64),now()+interval '30 days' FROM review_contributions LIMIT 1`);
+  await assert.rejects(
+    db.exec(`INSERT INTO answer_email_deliveries(id,contribution_id,recipient,subject,body,link_token_hash,link_expires_at)
+    SELECT gen_random_uuid(),contribution_id,'reader@example.com','Duplicate','Body',repeat('e',64),now() FROM answer_email_deliveries`),
+  );
+  await assert.rejects(db.exec('UPDATE answer_email_deliveries SET retry_count=6'));
+  await db.exec(
+    "INSERT INTO answer_email_attempts(id,delivery_id,attempt_no) VALUES(gen_random_uuid(),'00000000-0000-4000-8000-000000000030',1)",
+  );
+  await assert.rejects(
+    db.exec(
+      "INSERT INTO answer_email_attempts(id,delivery_id,attempt_no) VALUES(gen_random_uuid(),'00000000-0000-4000-8000-000000000030',1)",
+    ),
+  );
+  await assert.rejects(db.exec('DELETE FROM answer_email_deliveries'));
+  await db.exec('DELETE FROM answer_email_attempts; DELETE FROM answer_email_deliveries');
   const descriptions = (
     await db.query(`
     SELECT c.relname AS table_name, a.attname AS column_name,
@@ -261,7 +279,7 @@ try {
     WHERE n.nspname='public' AND c.relkind='r'
   `)
   ).rows;
-  assert.equal(descriptions.length, 261);
+  assert.equal(descriptions.length, 284);
   for (const row of descriptions) {
     assert.match(row.table_description ?? '', /[가-힣]/, row.table_name);
     assert.match(row.column_description ?? '', /[가-힣]/, `${row.table_name}.${row.column_name}`);
@@ -314,7 +332,7 @@ try {
     backfilled,
   );
   console.log(
-    'Database integrity and legacy migration tests passed (isolated PostgreSQL/PGlite, 33 tables).',
+    'Database integrity and legacy migration tests passed (isolated PostgreSQL/PGlite, 35 tables).',
   );
 } finally {
   await db.close();

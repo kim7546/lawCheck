@@ -848,3 +848,31 @@
     padding: 20px 16px;
   }
 }
+
+.admin-email-detail {
+  padding: 24px;
+}
+.admin-email-detail dl {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 12px;
+}
+.admin-email-detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.admin-email-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.7;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+.admin-email-detail h3 {
+  margin-top: 28px;
+}
+.admin-table-scroll {
+  overflow-x: auto;
+}

@@ -1,6 +1,8 @@
 import { createApp } from './app.js';
 import { PrismaClient } from '@prisma/client';
 import { ChatStorage } from './chat-storage.js';
+import { startAnswerEmailWorker, answerOrigin } from './answer-email.js';
+import { createEmailProvider, EmailTransportError } from './email-provider.js';
 import { bootstrapAdmin } from './admin-bootstrap.js';
 
 export interface ServerConfig {
@@ -17,6 +19,8 @@ export function readPort(value: string | undefined): number {
 
 export function startupErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.startsWith('CONFIG:')) return error.message;
+  if (error instanceof EmailTransportError)
+    return 'CONFIG: Invalid email configuration. Check EMAIL_TRANSPORT, EMAIL_FROM and SMTP/Resend settings.';
   const details = error as {
     code?: unknown;
     errorCode?: unknown;
@@ -40,7 +44,10 @@ export function startupErrorMessage(error: unknown): string {
 
 export async function startServer(config: ServerConfig) {
   const db = new PrismaClient();
+  let provider;
   try {
+    answerOrigin();
+    provider = createEmailProvider(process.env);
     await bootstrapAdmin(db, process.env.ADMIN_EMAIL);
   } catch (error) {
     await db.$disconnect();
@@ -56,10 +63,11 @@ export async function startServer(config: ServerConfig) {
       console.log(`LawCheck API: http://${config.host}:${config.port}/api/v1/health (prototype)`);
     },
   );
+  const stopEmailWorker = startAnswerEmailWorker(db, provider);
   for (const signal of ['SIGINT', 'SIGTERM'] as const)
     process.on(signal, () =>
       server.close(() => {
-        void db.$disconnect();
+        void stopEmailWorker().finally(() => db.$disconnect());
       }),
     );
   return server;

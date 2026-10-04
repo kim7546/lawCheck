@@ -97,9 +97,32 @@ PREVIEW_ALLOWED_HOSTS=aiqaver.com,www.aiqaver.com
 - Railway 공개 도메인은 Networking에서 생성합니다. `RAILWAY_PUBLIC_DOMAIN`은 Railway가 제공하므로 직접 추가할 필요가 없습니다. 이 도메인은 세 화면의 preview 설정에서 자동 허용합니다.
 - `PREVIEW_ALLOWED_HOSTS`는 추가 커스텀 호스트명을 쉼표로 구분합니다. `https://`, 경로, 포트는 넣지 않습니다.
 - API와 DB를 준비하고 migration을 적용한 뒤 BO 가입 → API `ADMIN_EMAIL` 설정 → Admin 로그인을 진행합니다.
-- 루트 `.env.example`은 로컬 Docker·개발용입니다. 통째로 Railway에 복사하지 않습니다. `POSTGRES_*`는 로컬 DB용이고 `SMTP_*`, `OPENAI_CLASSIFIER_MODEL`은 현재 앱 코드에서 사용하지 않습니다.
+- 루트 `.env.example`은 로컬 Docker·개발용입니다. 통째로 Railway에 복사하지 않습니다. `POSTGRES_*`는 로컬 DB용이고 `OPENAI_CLASSIFIER_MODEL`은 현재 앱 코드에서 사용하지 않습니다. 이메일 발송 변수는 아래 설정을 따릅니다.
 - `.env.example`은 참고 파일입니다. 이 파일 수정만으로 배포 환경변수가 적용되지는 않습니다.
 
 Railway에서는 다른 서비스 값을 `${{서비스명.변수명}}`으로 참조할 수 있습니다. 예를 들어 API 서비스 이름이 `API`이면 `API_PROXY_TARGET=https://${{API.RAILWAY_PUBLIC_DOMAIN}}`을 사용할 수 있습니다. 공개 도메인을 먼저 생성하고 실제 서비스 이름으로 바꿉니다. [Railway 변수 참조 문서](https://docs.railway.com/variables/reference)
 
 Variables의 Raw Editor에 값을 입력한 뒤 변경 사항을 Deploy해야 적용됩니다. [Railway 환경변수 문서](https://docs.railway.com/variables)
+
+## 전문가 답변 이메일과 발송 이력
+
+H-ERP의 SMTP/Resend 전송 방식과 DB 대기열·시도 이력·재시도 정책을 적용합니다. BO 전문가가 검증 답변을 완료하면 검증 요청 당시 등록한 질문자 이메일로 질문 원문, 답변 전문과 답변 열람 링크를 발송합니다. 여러 전문가가 답변하면 각 답변마다 한 번씩 등록됩니다. 답변 완료와 발송 대기열 저장은 같은 트랜잭션으로 처리합니다. 기존 완료 답변은 소급 발송하지 않습니다.
+
+API 서비스에 다음 변수를 설정하고 재배포합니다. 발송 작업은 API 프로세스에서 5초 간격으로 실행되므로 별도 Worker 서비스는 필요하지 않습니다.
+
+```dotenv
+FO_PUBLIC_URL=https://search.aiqaver.com
+EMAIL_TRANSPORT=smtp
+EMAIL_FROM=발신자 이메일
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=Gmail 이메일
+SMTP_PASSWORD=Gmail 앱 비밀번호
+```
+
+Resend를 사용하는 경우 `EMAIL_TRANSPORT=resend`, `EMAIL_FROM`에 인증된 발신 주소, `RESEND_API_KEY`에 API 키를 설정합니다. 비밀값은 API 환경변수에만 저장합니다. H-ERP와 같이 `SMTP_PASSWORD` 이름을 사용합니다. 기존 미사용 예제 변수 `SMTP_PASS`/`SMTP_FROM`은 각각 `SMTP_PASSWORD`/`EMAIL_FROM`으로 교체합니다. `EMAIL_TRANSPORT=disabled` 또는 SMTP 사용자만 있고 비밀번호가 없는 경우 대기열을 그대로 보존합니다. SMTP 설정 오류는 시작 시 감지합니다.
+
+migration `202610040001_answer_email`을 먼저 적용하고 API와 FO·Admin을 함께 배포합니다. Admin의 **이메일 발송이력**(`#emails`)에서 수신자/제목, 상태, 한국 날짜 기준 기간으로 조회하고 상세 본문과 시도별 오류를 확인합니다. 실패 건은 버전 확인 후 재발송할 수 있습니다. 최초 전송 포함 5회, 30/60/120/240초 간격으로 재시도하고 수동 재발송은 총 이력을 유지하면서 5회 한도를 다시 시작합니다. 다중 API 인스턴스는 행 잠금과 5분 lease로 작업을 나눕니다. 메일 서비스 접수와 DB 성공 기록 사이의 장애에서는 중복 메일 가능성이 있습니다. SENT는 서비스 접수 성공이며 수신함 도착/반송/열람은 추적하지 않습니다.
+
+전용 링크는 256비트 난수로 만들어 URL fragment에 담으며 30일간 해당 질문과 답변만 읽을 수 있습니다. 다른 기기에서도 열람 가능하고 기존 브라우저 소유권이나 답변 선택 권한은 부여하지 않습니다. 링크를 공유하면 받은 사람이 답변을 읽을 수 있습니다. 발송 시 이미 만료된 링크는 새 토큰과 30일 유효기간으로 갱신합니다. 이메일 본문은 관리자 상세에서 확인할 수 있으며 공급자 오류 응답 원문과 인증 비밀값은 저장하지 않습니다.

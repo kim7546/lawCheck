@@ -29,6 +29,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ChatResponse, ChatTurn, PublicConfig } from '@lawcheck/contracts';
+import { LinkedAnswer } from './LinkedAnswer';
 import { useVoiceInput } from './useVoiceInput';
 import { VoiceButton, VoiceInput } from './VoiceInput';
 
@@ -168,6 +169,19 @@ function Dialog({
   );
 }
 export default function App() {
+  const [hash, setHash] = useState(window.location.hash);
+  useEffect(() => {
+    const sync = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
+  return hash.startsWith('#answer=') ? (
+    <LinkedAnswer key={hash} token={hash.slice(8)} />
+  ) : (
+    <ChatApp />
+  );
+}
+function ChatApp() {
   const [config, setConfig] = useState(defaultConfig);
   const [question, setQuestion] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([]);

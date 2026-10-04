@@ -1,0 +1,50 @@
+name: Verify lawCheck
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: lawcheck
+          POSTGRES_PASSWORD: lawcheck_test
+          POSTGRES_DB: lawcheck_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lawcheck -d lawcheck_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://lawcheck:lawcheck_test@localhost:5432/lawcheck_test?schema=public
+      BOOTSTRAP_ADMIN_EMAIL: ''
+      BOOTSTRAP_ADMIN_PASSWORD: ''
+      ADMIN_EMAIL: ''
+      EMAIL_TRANSPORT: disabled
+      PLAYWRIGHT_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:db
+      - run: npm run build
+      - run: npm run db:deploy
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test tests/answer-email.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results
+          path: test-results

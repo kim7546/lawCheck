@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import type { ChatStorage } from './chat-storage.js';
 import { ChatError } from './chat.js';
+import { answerOrigin, enqueueAnswerEmail, tokenHash } from './answer-email.js';
 import { communityRouter } from './community.js';
 import {
   getOfficeSignupPolicy,
@@ -40,6 +41,7 @@ const tokenFrom = (req: Request) =>
     ?.slice(COOKIE.length + 1);
 
 export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
+  const origin = answerOrigin();
   const router = Router();
   const attempts = new Map<string, { count: number; expires: number }>();
   router.use((_req, res, next) => {
@@ -278,22 +280,56 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
       throw fail(400, '검증 답변을 1~20,000자로 입력해 주세요.');
     if (!(await db.reviewBoardPost.findUnique({ where: { id }, select: { id: true } })))
       throw fail(404, '요청을 찾을 수 없습니다.');
-    const changed =
-      action === 'claim'
-        ? await db.reviewContribution.createMany({
-            data: { postId: id, expertId: user.id },
-            skipDuplicates: true,
-          })
-        : await db.reviewContribution.updateMany({
-            where: { postId: id, expertId: user.id, status: 'REVIEWING' },
-            data: { status: 'COMPLETED', reply: reply.trim(), completedAt: new Date() },
-          });
-    if (!changed.count)
-      throw fail(
-        409,
-        '이미 검증을 시작했거나 완료한 질문입니다. 검증 시작 후 질문당 한 번만 답변할 수 있습니다.',
-      );
+    await db.$transaction(async (tx) => {
+      const changed =
+        action === 'claim'
+          ? await tx.reviewContribution.createMany({
+              data: { postId: id, expertId: user.id },
+              skipDuplicates: true,
+            })
+          : await tx.reviewContribution.updateMany({
+              where: { postId: id, expertId: user.id, status: 'REVIEWING' },
+              data: { status: 'COMPLETED', reply: reply.trim(), completedAt: new Date() },
+            });
+      if (!changed.count)
+        throw fail(
+          409,
+          '이미 검증을 시작했거나 완료한 질문입니다. 검증 시작 후 질문당 한 번만 답변할 수 있습니다.',
+        );
+      if (action === 'complete') await enqueueAnswerEmail(tx, id, user.id, origin);
+    });
     res.json({ success: true });
+  });
+  router.get('/review-answer/:token', async (req, res) => {
+    const token = String(req.params.token);
+    res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+    if (!/^[a-f0-9]{64}$/.test(token))
+      throw fail(404, '답변 링크가 유효하지 않거나 만료되었습니다.');
+    const delivery = await db.answerEmailDelivery.findUnique({
+      where: { linkTokenHash: tokenHash(token) },
+      select: {
+        linkExpiresAt: true,
+        contribution: {
+          select: {
+            reply: true,
+            completedAt: true,
+            expert: { select: { name: true } },
+            post: { select: { question: true } },
+          },
+        },
+      },
+    });
+    if (!delivery || delivery.linkExpiresAt <= new Date())
+      throw fail(404, '답변 링크가 유효하지 않거나 만료되었습니다.');
+    res.json({
+      success: true,
+      data: {
+        question: delivery.contribution.post.question,
+        reply: delivery.contribution.reply,
+        author: delivery.contribution.expert.name,
+        completedAt: delivery.contribution.completedAt,
+      },
+    });
   });
   router.post('/reviews', async (req, res) => {
     const { answerMessageId, email, consent } = req.body ?? {};
