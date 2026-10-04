@@ -323,11 +323,13 @@ model FoConversation {
   /// 이용자 브라우저 식별자
   browserId String @map("browser_id") @db.Uuid
   /// 채팅 세션 식별자
-  sessionId String @unique @map("session_id") @db.Uuid
+  sessionId String @map("session_id") @db.Uuid
   /// 생성 일시
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   browser FoBrowser @relation(fields: [browserId], references: [id], onDelete: Cascade)
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  @@unique([browserId, sessionId])
+  @@index([sessionId])
   @@index([browserId, createdAt])
   @@map("fo_conversations")
 }
@@ -624,7 +626,7 @@ model LawyerLeave {
 
 /// 채팅 세션: 익명 대화의 질문 횟수, 소속 사무소 및 만료 관리
 model ChatSession {
-  foConversation FoConversation?
+  foConversations FoConversation[]
   /// 채팅 세션 식별자
   id                   String                @id @default(uuid()) @db.Uuid
   /// 소속 법률사무소 식별자

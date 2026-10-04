@@ -1284,3 +1284,17 @@ dialog::backdrop {
 .linked-answer h2 {
   margin-top: 32px;
 }
+
+.email-restored {
+  text-align: center;
+  color: var(--brand-blue);
+  font-size: 13px;
+}
+.email-restored button {
+  margin-left: 12px;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}

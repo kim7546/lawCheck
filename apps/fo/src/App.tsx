@@ -170,18 +170,24 @@ function Dialog({
 }
 export default function App() {
   const [hash, setHash] = useState(window.location.hash);
+  const [restoredSessionId, setRestoredSessionId] = useState<string>();
+  const onRestored = useCallback((sessionId: string) => {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setRestoredSessionId(sessionId);
+    setHash('');
+  }, []);
   useEffect(() => {
     const sync = () => setHash(window.location.hash);
     window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
   }, []);
   return hash.startsWith('#answer=') ? (
-    <LinkedAnswer key={hash} token={hash.slice(8)} />
+    <LinkedAnswer key={hash} token={hash.slice(8)} onRestored={onRestored} />
   ) : (
-    <ChatApp />
+    <ChatApp key={restoredSessionId} restoredSessionId={restoredSessionId} />
   );
 }
-function ChatApp() {
+function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
   const [config, setConfig] = useState(defaultConfig);
   const [question, setQuestion] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([]);
@@ -285,7 +291,13 @@ function ChatApp() {
         setConfig(data);
         setQuota(data.remainingQuestions ?? 3);
         try {
-          const history = await api<History>('/chat/history', undefined, controller.signal);
+          const history = restoredSessionId
+            ? await api<History>(
+                `/chat/conversations/${restoredSessionId}/select`,
+                {},
+                controller.signal,
+              )
+            : await api<History>('/chat/history', undefined, controller.signal);
           if (!controller.signal.aborted) {
             if (history.sessionId) {
               currentIdRef.current = history.sessionId;
@@ -308,7 +320,7 @@ function ChatApp() {
       controller.abort();
       activeRequest.current?.abort();
     };
-  }, [refreshMetadata]);
+  }, [refreshMetadata, restoredSessionId]);
   useEffect(() => {
     if (!ready) return;
     const controller = new AbortController();
@@ -831,6 +843,12 @@ function ChatApp() {
         </header>
         <main className="conversation-pane" aria-busy={switching}>
           <div className="chat-scroll">
+            {restoredSessionId === currentId && (
+              <p className="email-restored" role="status">
+                메일 링크의 질문과 답변을 복원했습니다.
+                <button onClick={() => openResults(currentId)}>전문가 답변 보기</button>
+              </p>
+            )}
             {error && (
               <p className="page-error" role="alert">
                 {error}

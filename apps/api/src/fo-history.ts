@@ -74,7 +74,7 @@ export class FoHistory {
                 sessionTokenHash: hash(legacyToken),
                 lawOfficeId: officeId,
                 expiresAt: { gt: new Date() },
-                foConversation: null,
+                foConversations: { none: {} },
               },
             })
           : null;
@@ -94,6 +94,45 @@ export class FoHistory {
         data: { activeSessionId: session.id },
       });
       return session;
+    });
+  }
+
+  async restoreEmailConversation(req: Request, res: Response, token: string) {
+    const invalid = () =>
+      new ChatError(404, 'REVIEW_ERROR', '답변 링크가 유효하지 않거나 만료되었습니다.');
+    if (!/^[a-f0-9]{64}$/.test(token)) throw invalid();
+    const browser = await this.browser(req, res);
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM fo_browsers WHERE id = ${browser.id}::uuid FOR UPDATE`;
+      const delivery = await tx.answerEmailDelivery.findFirst({
+        where: {
+          linkTokenHash: hash(token),
+          linkExpiresAt: { gt: new Date() },
+          contribution: { status: 'COMPLETED' },
+        },
+        select: { contribution: { select: { post: { select: { sessionId: true } } } } },
+      });
+      if (!delivery) throw invalid();
+      const sessionId = delivery.contribution.post.sessionId;
+      const session = await tx.chatSession.findFirst({
+        where: { id: sessionId, lawOffice: { isActive: true } },
+      });
+      if (!session) throw invalid();
+      await tx.foConversation.upsert({
+        where: { browserId_sessionId: { browserId: browser.id, sessionId } },
+        create: { browserId: browser.id, sessionId },
+        update: {},
+      });
+      await tx.foBrowser.update({
+        where: { id: browser.id },
+        data: { activeSessionId: sessionId },
+      });
+      if (session.expiresAt < browser.expiresAt)
+        await tx.chatSession.update({
+          where: { id: sessionId },
+          data: { expiresAt: browser.expiresAt },
+        });
+      return { sessionId };
     });
   }
 

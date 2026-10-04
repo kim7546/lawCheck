@@ -300,6 +300,17 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
     });
     res.json({ success: true });
   });
+  router.post('/review-answer/:token/restore', async (req, res) => {
+    if (req.headers.origin === 'null' || req.headers['sec-fetch-site'] === 'same-site')
+      throw fail(403, '다른 사이트에서 대화를 복원할 수 없습니다.');
+    res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+    const data = await storage.browserHistory.restoreEmailConversation(
+      req,
+      res,
+      String(req.params.token),
+    );
+    res.json({ success: true, data });
+  });
   router.get('/review-answer/:token', async (req, res) => {
     const token = String(req.params.token);
     res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });

@@ -1,44 +1,38 @@
 import { useEffect, useState } from 'react';
-import type { LinkedReviewAnswer } from '@lawcheck/contracts';
-export function LinkedAnswer({ token }: { token: string }) {
-  const [answer, setAnswer] = useState<LinkedReviewAnswer | null>(null);
+export function LinkedAnswer({
+  token,
+  onRestored,
+}: {
+  token: string;
+  onRestored: (sessionId: string) => void;
+}) {
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/v1/review-answer/${encodeURIComponent(token)}`, {
+    fetch(`/api/v1/review-answer/${encodeURIComponent(token)}/restore`, {
+      method: 'POST',
+      credentials: 'same-origin',
       signal: controller.signal,
       cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
     })
       .then(async (response) => {
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message ?? '답변을 불러오지 못했습니다.');
-        setAnswer(result.data);
+        if (!response.ok) throw new Error(result.error?.message ?? '대화를 복원하지 못했습니다.');
+        if (!controller.signal.aborted) onRestored(result.data.sessionId);
       })
       .catch((cause: unknown) => {
         if (!controller.signal.aborted)
-          setError(cause instanceof Error ? cause.message : '답변을 불러오지 못했습니다.');
+          setError(cause instanceof Error ? cause.message : '대화를 복원하지 못했습니다.');
       });
     return () => controller.abort();
-  }, [token]);
+  }, [token, onRestored]);
   return (
     <main className="linked-answer">
       <a href="/">AI QAVER 홈으로</a>
-      <h1>전문가 답변</h1>
-      {error ? (
-        <p role="alert">{error}</p>
-      ) : answer ? (
-        <>
-          <h2>질문</h2>
-          <p>{answer.question}</p>
-          <h2>{answer.author}님의 답변</h2>
-          <p>{answer.reply}</p>
-          <small>
-            {new Date(answer.completedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
-          </small>
-        </>
-      ) : (
-        <p role="status">답변을 불러오고 있습니다.</p>
-      )}
+      <h1>질문 대화 복원</h1>
+      {error ? <p role="alert">{error}</p> : <p role="status">질문과 답변을 불러오고 있습니다.</p>}
     </main>
   );
 }

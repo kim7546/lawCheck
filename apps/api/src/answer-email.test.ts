@@ -60,7 +60,11 @@ test(
           requesterEmail: 'questioner@example.com',
         },
       });
-      const app = createApp('Test', undefined, { db, storage: new ChatStorage(db) });
+      const app = createApp(
+        'Test',
+        async () => ({ answer: '이어서 받은 AI 답변', isLegalQuestion: true }),
+        { db, storage: new ChatStorage(db) },
+      );
       const bo = request.agent(app),
         admin = request.agent(app);
       await bo.post('/api/v1/bo/login').send({ identifier: expert.email, password }).expect(200);
@@ -96,6 +100,91 @@ test(
       assert.equal(linked.body.data.recipient, undefined);
       await request(app)
         .get(`/api/v1/review-answer/${'f'.repeat(64)}`)
+        .expect(404);
+      // Restore the same conversation on a new browser without moving the original ownership.
+      const original = request.agent(app),
+        restored = request.agent(app),
+        outsider = request.agent(app);
+      await original.get('/api/v1/config').expect(200);
+      const originalHistory = (await original.get('/api/v1/chat/history').expect(200)).body.data;
+      const session = await db.chatSession.findUniqueOrThrow({
+        where: { id: originalHistory.sessionId },
+      });
+      const questionId = randomUUID();
+      await db.chatMessage.createMany({
+        data: [
+          {
+            id: questionId,
+            lawOfficeId: session.lawOfficeId,
+            sessionId: session.id,
+            sequenceNo: 1,
+            role: 'USER',
+            messageType: 'USER_QUESTION',
+            processingStatus: 'COMPLETED',
+            content: post.question,
+          },
+          {
+            id: post.answerMessageId,
+            lawOfficeId: session.lawOfficeId,
+            sessionId: session.id,
+            sequenceNo: 2,
+            role: 'ASSISTANT',
+            messageType: 'AI_ANSWER',
+            processingStatus: 'COMPLETED',
+            content: post.aiAnswer,
+            parentMessageId: questionId,
+          },
+        ],
+      });
+      await db.reviewBoardPost.update({ where: { id: post.id }, data: { sessionId: session.id } });
+      await restored.post('/api/v1/chat').send({ question: '새 브라우저의 다른 대화' }).expect(200);
+      const otherSessionId = (await restored.get('/api/v1/chat/history').expect(200)).body.data
+        .sessionId;
+      await outsider.post(`/api/v1/chat/conversations/${session.id}/select`).send({}).expect(404);
+      await restored
+        .post(`/api/v1/review-answer/${token}/restore`)
+        .set('Sec-Fetch-Site', 'cross-site')
+        .send({})
+        .expect(403);
+      await db.chatSession.update({ where: { id: session.id }, data: { expiresAt: new Date(0) } });
+      await restored
+        .post(`/api/v1/review-answer/${token}/restore`)
+        .send({})
+        .expect(200)
+        .then((r) => assert.equal(r.body.data.sessionId, session.id));
+      await restored.post(`/api/v1/review-answer/${token}/restore`).send({}).expect(200);
+      assert.equal(await db.foConversation.count({ where: { sessionId: session.id } }), 2);
+      const conversations = (await restored.get('/api/v1/chat/conversations').expect(200)).body
+        .data;
+      assert.ok(conversations.some((item: { id: string }) => item.id === otherSessionId));
+      assert.ok(conversations.some((item: { id: string }) => item.id === session.id));
+      const restoredHistory = (await restored.get('/api/v1/chat/history').expect(200)).body.data;
+      assert.equal(restoredHistory.sessionId, session.id);
+      assert.deepEqual(
+        restoredHistory.messages.map((m: { content: string }) => m.content),
+        [post.question, post.aiAnswer],
+      );
+      assert.equal(
+        (await original.get('/api/v1/chat/history').expect(200)).body.data.sessionId,
+        session.id,
+      );
+      const restoredReviews = (await restored.get('/api/v1/reviews').expect(200)).body.data;
+      assert.equal(restoredReviews[0].answers[0].reply, '전문가 답변 전문');
+      await restored
+        .post(`/api/v1/reviews/${post.id}/selection`)
+        .send({ answerId: delivery.contributionId })
+        .expect(200);
+      await restored
+        .post('/api/v1/chat')
+        .send({ sessionId: session.id, question: '복원한 대화의 추가 질문' })
+        .expect(200);
+      assert.equal(
+        (await original.get('/api/v1/chat/history').expect(200)).body.data.messages.length,
+        4,
+      );
+      await outsider
+        .post(`/api/v1/review-answer/${'f'.repeat(64)}/restore`)
+        .send({})
         .expect(404);
       await request(app).get('/api/v1/admin/emails').expect(401);
       await bo.get('/api/v1/admin/emails').expect(401);
@@ -188,6 +277,7 @@ test(
         data: { linkExpiresAt: new Date(0) },
       });
       await request(app).get(`/api/v1/review-answer/${token}`).expect(404);
+      await outsider.post(`/api/v1/review-answer/${token}/restore`).send({}).expect(404);
       await db.expertAdminProfile.update({
         where: { accountId: expert.id },
         data: { isActive: false },

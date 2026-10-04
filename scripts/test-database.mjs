@@ -269,6 +269,33 @@ try {
   );
   await assert.rejects(db.exec('DELETE FROM answer_email_deliveries'));
   await db.exec('DELETE FROM answer_email_attempts; DELETE FROM answer_email_deliveries');
+  // Email restoration keeps both browsers linked; repeat restore cannot duplicate a link.
+  await db.exec(`
+    INSERT INTO chat_sessions(id,law_office_id,session_token_hash,expires_at,updated_at)
+      SELECT '00000000-0000-4000-8000-000000000040',id,repeat('1',64),now()+interval '30 days',now() FROM law_offices LIMIT 1;
+    INSERT INTO fo_browsers(id,token_hash,expires_at) VALUES
+      ('00000000-0000-4000-8000-000000000041',repeat('2',64),now()+interval '30 days'),
+      ('00000000-0000-4000-8000-000000000042',repeat('3',64),now()+interval '30 days');
+    INSERT INTO fo_conversations(id,browser_id,session_id) VALUES
+      (gen_random_uuid(),'00000000-0000-4000-8000-000000000041','00000000-0000-4000-8000-000000000040'),
+      (gen_random_uuid(),'00000000-0000-4000-8000-000000000042','00000000-0000-4000-8000-000000000040');
+  `);
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::int AS count FROM fo_conversations WHERE session_id='00000000-0000-4000-8000-000000000040'",
+      )
+    ).rows[0].count,
+    2,
+  );
+  await assert.rejects(
+    db.exec(
+      "INSERT INTO fo_conversations(id,browser_id,session_id) VALUES(gen_random_uuid(),'00000000-0000-4000-8000-000000000042','00000000-0000-4000-8000-000000000040')",
+    ),
+  );
+  await db.exec(
+    "DELETE FROM fo_browsers WHERE id IN ('00000000-0000-4000-8000-000000000041','00000000-0000-4000-8000-000000000042'); DELETE FROM chat_sessions WHERE id='00000000-0000-4000-8000-000000000040'",
+  );
   const descriptions = (
     await db.query(`
     SELECT c.relname AS table_name, a.attname AS column_name,

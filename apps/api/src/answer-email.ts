@@ -34,7 +34,7 @@ export async function enqueueAnswerEmail(
       contributionId: answer.id,
       recipient: answer.post.requesterEmail,
       subject: '[AI QAVER] 질문에 전문가 답변이 등록되었습니다',
-      body: `등록하신 질문에 ${answer.expert.name}님이 답변했습니다.\n\n질문\n${answer.post.question}\n\n답변\n${answer.reply}\n\n답변 확인 링크 (30일간 유효)\n${link}\n\n이 링크를 가진 사람은 답변을 열람할 수 있으므로 공유에 주의해 주세요.`,
+      body: `등록하신 질문에 ${answer.expert.name}님이 답변했습니다.\n\n질문\n${answer.post.question}\n\n답변\n${answer.reply}\n\n답변 확인 링크 (30일간 유효)\n${link}\n\n이 링크를 가진 사람은 질문 대화를 복원하고 이어서 질문할 수 있으므로 공유에 주의해 주세요.`,
       linkTokenHash: tokenHash(token),
       linkExpiresAt: new Date(Date.now() + 30 * 86400000),
     },

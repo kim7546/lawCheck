@@ -81,38 +81,107 @@ test('admin email history searches, shows attempts, retries failure and recovers
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
-test('email link reads its answer on a new browser and reports expired links', async ({ page }) => {
-  const token = 'a'.repeat(64);
-  let expired = false;
-  await page.route('**/api/v1/review-answer/**', async (route) => {
-    expect(new URL(route.request().url()).pathname).toBe(`/api/v1/review-answer/${token}`);
-    await route.fulfill(
-      expired
-        ? {
-            status: 404,
-            json: {
-              success: false,
-              error: { message: '답변 링크가 유효하지 않거나 만료되었습니다.' },
+test('email link restores the question screen, expert replies and further questions on a new browser', async ({
+  page,
+}) => {
+  const token = 'a'.repeat(64),
+    sessionId = '00000000-0000-4000-8000-000000000012';
+  const history = {
+    sessionId,
+    remainingQuestions: null,
+    messages: [
+      {
+        id: 'question',
+        parentMessageId: null,
+        role: 'USER',
+        content: '등록한 질문 원문',
+        messageType: 'USER_QUESTION',
+        processingStatus: 'COMPLETED',
+      },
+      {
+        id: 'answer',
+        parentMessageId: 'question',
+        role: 'ASSISTANT',
+        content: '이전 AI 답변',
+        messageType: 'AI_ANSWER',
+        processingStatus: 'COMPLETED',
+      },
+    ],
+  };
+  let restored = false;
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown;
+    if (path === `/api/v1/review-answer/${token}/restore`) {
+      expect(route.request().method()).toBe('POST');
+      restored = true;
+      data = { sessionId };
+    } else if (path === '/api/v1/config')
+      data = {
+        officeName: 'Test',
+        mode: 'prototype',
+        questionLimitEnabled: false,
+        remainingQuestions: null,
+        maxQuestions: 3,
+        voiceInputEnabled: false,
+      };
+    else if (path.endsWith('/select')) {
+      expect(restored).toBe(true);
+      data = history;
+    } else if (path === '/api/v1/chat/conversations')
+      data = [{ id: sessionId, title: '등록한 질문 원문', updatedAt: '2026-10-04T01:00:00Z' }];
+    else if (path === '/api/v1/reviews')
+      data = [
+        {
+          id: 'review',
+          sessionId,
+          answerMessageId: 'answer',
+          question: '등록한 질문 원문',
+          selectedAnswerId: null,
+          answers: [
+            {
+              id: 'expert-answer',
+              reply: '전문가 답변 전문',
+              unread: true,
+              completedAt: '2026-10-04T01:00:00Z',
+              expert: { name: '홍전문' },
             },
-          }
-        : {
-            json: {
-              success: true,
-              data: {
-                question: '등록한 질문 원문',
-                reply: '전문가 답변 전문\n두 번째 줄',
-                author: '홍전문',
-                completedAt: '2026-10-04T01:00:00Z',
-              },
-            },
-          },
-    );
+          ],
+        },
+      ];
+    else if (path === '/api/v1/chat') {
+      expect(route.request().postDataJSON().sessionId).toBe(sessionId);
+      data = {
+        answer: '추가 질문의 답변',
+        isLegalQuestion: true,
+        sessionId,
+        questionMessageId: 'new-question',
+        answerMessageId: 'new-answer',
+      };
+    } else data = {};
+    await route.fulfill({ json: { success: true, data } });
   });
   await page.goto(`http://127.0.0.1:5173/#answer=${token}`);
-  await expect(page.getByRole('heading', { name: '전문가 답변', exact: true })).toBeVisible();
-  await expect(page.getByText('전문가 답변 전문\n두 번째 줄')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '홍전문님의 답변' })).toBeVisible();
-  expired = true;
-  await page.reload();
+  await expect(page.getByText('메일 링크의 질문과 답변을 복원했습니다.')).toBeVisible();
+  await expect(page.locator('.user-message')).toContainText('등록한 질문 원문');
+  await expect(page.locator('.assistant-body')).toContainText('이전 AI 답변');
+  expect(page.url()).not.toContain(token);
+  await page.getByRole('button', { name: '전문가 답변 보기', exact: true }).click();
+  await expect(page.getByText('전문가 답변 전문', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '닫기', exact: true }).click();
+  await page.getByRole('textbox', { name: '질문', exact: true }).fill('이어지는 질문');
+  await page.getByRole('button', { name: '질문 보내기', exact: true }).click();
+  await expect(page.locator('.assistant-body').last()).toContainText('추가 질문의 답변');
+});
+
+test('expired email links do not open another conversation', async ({ page }) => {
+  await page.route('**/api/v1/review-answer/**', (route) =>
+    route.fulfill({
+      status: 404,
+      json: { success: false, error: { message: '답변 링크가 유효하지 않거나 만료되었습니다.' } },
+    }),
+  );
+  await page.goto(`http://127.0.0.1:5173/#answer=${'a'.repeat(64)}`);
   await expect(page.getByRole('alert')).toContainText('만료되었습니다');
+  await expect(page.getByRole('textbox', { name: '질문', exact: true })).toHaveCount(0);
 });
