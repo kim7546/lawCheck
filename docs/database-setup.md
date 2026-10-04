@@ -111,7 +111,7 @@ Railway 내부 DB 주소는 같은 프로젝트의 실행 환경에서 사용합
 | Start Command                                   | `node apps/api/dist/server.deploy.js` |
 | Healthcheck Path                                | `/api/v1/health`                      |
 
-기존 `/apps/api/railway.json`은 DB 없이 사용하는 기존 배포용입니다. **DB를 만든 뒤 `railway.database.json`으로 바꿔야 자동 migration이 적용됩니다.**
+`/apps/api/railway.json`은 Railpack 빌드, `/apps/api/railway.database.json`은 Docker 빌드를 사용합니다. 두 설정 모두 `npm run db:deploy` 사전 실행으로 migration과 seed를 적용하므로 빌드 방식에 맞춰 선택합니다. 현재 운영 API는 Railpack 설정을 사용합니다.
 UI에 수동으로 넣은 이전 build/start 명령이 있으면 새 배포의 적용 설정을 확인합니다. Docker 빌드는 Dockerfile이 담당합니다.
 Dockerfile은 Prisma Client를 생성하고 API를 빌드합니다. 런타임에도 Prisma CLI를 포함하여 pre-deploy에서 migration과 seed를 실행합니다.
 Railway의 pre-deploy는 내부 네트워크에서 실행되므로 DB 서비스 참조를 사용할 수 있습니다. migration 실패 시 로그를 해결한 뒤 재배포합니다.

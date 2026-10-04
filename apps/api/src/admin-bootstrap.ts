@@ -6,6 +6,10 @@ export async function bootstrapAdmin(db: PrismaClient, configuredEmail: string |
   if (!email) return;
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     throw new Error('CONFIG: ADMIN_EMAIL must be a valid existing BO email.');
+  if (!db.expertAccount || !db.expertAdminProfile)
+    throw new Error(
+      'CONFIG: Prisma Client is outdated. Run npm run db:generate and restart the API.',
+    );
   await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT account_id FROM expert_admin_profiles ORDER BY account_id FOR UPDATE`;
     const user = await tx.expertAccount.findUnique({

@@ -75,7 +75,7 @@ FO·BO·Admin의 로컬 개발 설정은 각 앱의 `vite.config.ts`, 배포 확
 
 FO·BO·Admin은 기본적으로 검색엔진 색인을 차단합니다. `SEARCH_ENGINE_INDEXING_ENABLED=false` 또는 미설정 시 `noindex, nofollow`를 적용합니다. 검색을 허용하려면 해당 서비스의 값을 `true`로 바꾸고 **재빌드·재배포**합니다. 로컬에서는 루트 `.env`에 설정한 뒤 개발 서버를 재시작합니다. 앱별 설정과 확인 방법은 [검색엔진 노출 설정](docs/search-indexing.md)을 참고하세요.
 
-API의 로컬 설정은 `apps/api/src/server.config.ts`, Railway 배포 설정은 `apps/api/src/server.deploy.config.ts`입니다. API 서비스에서 `/apps/api/railway.json`을 Config File로 지정하고 저장소 루트에서 빌드·실행합니다. `npm run start -w @lawcheck/api`는 배포 진입 파일로 실행하여 `0.0.0.0:$PORT`에 바인딩하며 로컬 `.env`를 읽지 않습니다. IntelliJ 디버그는 기존 `apps/api/src/server.ts`를 그대로 사용합니다.
+API의 로컬 설정은 `apps/api/src/server.config.ts`, Railway 배포 설정은 `apps/api/src/server.deploy.config.ts`입니다. API 서비스에서 `/apps/api/railway.json`을 Config File로 지정하고 저장소 루트에서 빌드·실행합니다. 배포 전에 `npm run db:deploy`로 migration과 seed를 적용하므로 API의 `DATABASE_URL`에 PostgreSQL 연결을 설정합니다. `npm run start -w @lawcheck/api`는 배포 진입 파일로 실행하여 `0.0.0.0:$PORT`에 바인딩하며 로컬 `.env`를 읽지 않습니다. IntelliJ 디버그는 기존 `apps/api/src/server.ts`를 그대로 사용합니다.
 
 ## 데이터베이스 준비
 

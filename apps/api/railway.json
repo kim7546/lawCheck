@@ -13,6 +13,7 @@
     ]
   },
   "deploy": {
+    "preDeployCommand": ["npm run db:deploy"],
     "startCommand": "npm run start -w @lawcheck/api",
     "healthcheckPath": "/api/v1/health",
     "healthcheckTimeout": 60,

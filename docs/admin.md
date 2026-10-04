@@ -72,6 +72,8 @@ ADMIN_EMAIL=existing-member@example.com
 
 API는 시작할 때 해당 회원을 확인하고 관리자 권한을 연결합니다. 미가입 이메일, 잘못된 이메일, 중지된 회원이면 오류를 출력하고 종료 코드 1로 시작을 중단합니다. 정상 등록된 관리자는 재시작해도 중복 생성되지 않습니다. `ADMIN_EMAIL`이 비어 있으면 환경변수에 의한 관리자 설정을 건너뛰므로, 최초 배포에서는 비워 두고 BO 가입 후 설정할 수 있습니다.
 
+로컬 API가 관리자 초기화 오류로 시작되지 않으면 `npm run db:up`과 `npm run db:setup`으로 DB와 Prisma Client를 먼저 준비합니다. `npm run dev -w @lawcheck/api`는 시작 전에 Client를 자동 생성합니다. IntelliJ에서 `server.ts`를 직접 실행하는 경우에는 `npm run db:generate` 후 디버그를 다시 시작합니다. 시작 로그는 접속 실패와 테이블·컬럼 누락을 구분하고 복구 명령을 표시합니다. 아직 BO 회원이 없는 새 DB에서는 `ADMIN_EMAIL`을 비워 API를 실행하고 BO 가입을 완료한 뒤 설정합니다.
+
 기존 BO 아이디·이메일과 비밀번호로 Admin에 로그인합니다. `ADMIN_PASSWORD`, `ADMIN_USERNAME`, `ADMIN_NAME`은 사용하지 않으며 회원 정보를 덮어쓰지 않습니다. 이전 `create` 명령은 제거되어 오류로 종료합니다.
 
 서버를 재시작하지 않고 환경변수의 회원에게 권한을 부여하려면 다음 명령을 실행합니다. 이메일을 생략한 `grant`는 `ADMIN_EMAIL`을 사용하며, 해당 회원이 없으면 실패합니다.

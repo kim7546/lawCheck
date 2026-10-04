@@ -109,11 +109,11 @@ Root Directory는 비워두거나 `/`로 설정하여 저장소 루트에서 npm
 | Root Directory      | 저장소 루트 (`/`)                |
 | Build Command       | `npm run build -w @lawcheck/api` |
 | Start Command       | `npm run start -w @lawcheck/api` |
-| Pre-deploy Command  | 비워두기                         |
+| Pre-deploy Command  | `npm run db:deploy`              |
 | Healthcheck Path    | `/api/v1/health`                 |
 | Healthcheck Timeout | 60초                             |
 
-빌드·시작 명령과 healthcheck는 `railway.json`에 포함되어 있습니다.
+빌드·사전 마이그레이션·시작 명령과 healthcheck는 `railway.json`에 포함되어 있습니다. 사전 실행에서 누적 migration과 사무실 seed를 적용하며 실패하면 새 배포를 시작하지 않습니다.
 Railway Variables에는 아래 값을 설정합니다. 예시는 `apps/api/.env.example`에도 있습니다.
 
 ```dotenv
@@ -131,7 +131,7 @@ QUESTION_LIMIT_ENABLED=false
 Railway 자동 할당 `PORT`를 사용해도 되지만 Target port와 실제 리스닝 포트가 일치해야 합니다.
 FO의 포트와 API 포트는 서로 달라도 됩니다. 모델은 사용하려는 모델 ID로 지정합니다.
 `.env.example`은 참고용이며 배포 서버가 자동으로 읽지 않습니다. 비밀 키는 Railway Variables에 입력합니다.
-위 `/apps/api/railway.json`은 DB 없이 시작하는 기존 설정입니다. PostgreSQL을 함께 준비하려면 [DB 설치·Railway 연결 안내](database-setup.md)에 따라 DB 서비스를 생성하고 API Config File을 `/apps/api/railway.database.json`으로 변경하세요. 이 설정은 Docker 빌드와 `npm run db:deploy` pre-deploy migration을 포함합니다.
+위 `/apps/api/railway.json`은 Railpack 빌드와 `npm run db:deploy` 사전 마이그레이션을 사용합니다. API 서비스의 `DATABASE_URL`에 해당 환경의 PostgreSQL 연결을 설정합니다. Docker 빌드를 사용하려면 [DB 설치·Railway 연결 안내](database-setup.md)에 따라 `/apps/api/railway.database.json`을 선택합니다. 두 설정 모두 사전 마이그레이션과 seed를 적용합니다.
 
 Admin·FO·BO Variables의 `API_PROXY_TARGET`은 `https://api.aiqaver.com`으로 지정하고 재배포합니다. 별도 개발 환경은 해당 API origin으로 바꿉니다.
 API 경로 `/api/v1`은 붙이지 않습니다. 브라우저 요청은 FO·BO의 `/api` 프록시를 통해 전달됩니다.
