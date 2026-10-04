@@ -1,3 +1,6 @@
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+
 # Copy to .codex/config.toml in a trusted project to enable documentation lookup.
 # No private token is required. This does not invoke GPT on behalf of the app.
 [mcp_servers.openaiDeveloperDocs]
