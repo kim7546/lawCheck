@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { EmailTransportError, type EmailProvider } from './email-provider.js';
+import { renderAnswerEmail } from './email-template.js';
 
 export const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
 export function answerOrigin(env: NodeJS.ProcessEnv = process.env) {
@@ -109,6 +110,7 @@ export async function processAnswerEmail(
       recipient: job.delivery.recipient,
       subject: job.delivery.subject,
       text: job.delivery.body,
+      html: renderAnswerEmail(job.delivery.body),
       messageKey: job.attempt.id,
     });
   } catch (error) {

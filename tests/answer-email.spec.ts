@@ -161,7 +161,7 @@ test('email link restores the question screen, expert replies and further questi
     } else data = {};
     await route.fulfill({ json: { success: true, data } });
   });
-  await page.goto(`http://127.0.0.1:5173/#answer=${token}`);
+  await page.goto(`/#answer=${token}`);
   await expect(page.getByText('메일 링크의 질문과 답변을 복원했습니다.')).toBeVisible();
   await expect(page.locator('.user-message')).toContainText('등록한 질문 원문');
   await expect(page.locator('.assistant-body')).toContainText('이전 AI 답변');
@@ -181,7 +181,7 @@ test('expired email links do not open another conversation', async ({ page }) =>
       json: { success: false, error: { message: '답변 링크가 유효하지 않거나 만료되었습니다.' } },
     }),
   );
-  await page.goto(`http://127.0.0.1:5173/#answer=${'a'.repeat(64)}`);
+  await page.goto(`/#answer=${'a'.repeat(64)}`);
   await expect(page.getByRole('alert')).toContainText('만료되었습니다');
   await expect(page.getByRole('textbox', { name: '질문', exact: true })).toHaveCount(0);
 });

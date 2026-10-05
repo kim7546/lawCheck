@@ -18,6 +18,7 @@ import {
   enqueueAnswerEmail,
 } from './answer-email.js';
 import { createEmailProvider, EmailTransportError, type OutgoingEmail } from './email-provider.js';
+import { renderAnswerEmail } from './email-template.js';
 
 test(
   'answer completion queues atomically; sending, retries, leases, links and admin history',
@@ -78,7 +79,7 @@ test(
       await bo
         .post(`/api/v1/bo/reviews/${post.id}/complete`)
         .send({ reply: '전문가 답변 전문' })
-        .expect(500);
+        .expect(503);
       assert.equal((await db.reviewContribution.findFirstOrThrow()).status, 'REVIEWING');
       await pg.exec(
         'DROP TRIGGER fail_email ON answer_email_deliveries; DROP FUNCTION fail_email()',
@@ -213,6 +214,9 @@ test(
       assert.equal(sent.length, 1);
       assert.equal(sent[0]!.recipient, delivery.recipient);
       assert.equal(sent[0]!.text, delivery.body);
+      assert.ok(sent[0]!.html?.includes('alt="AI QAVER"'));
+      assert.ok(sent[0]!.html?.includes(`/#answer=${token}`));
+      assert.ok(sent[0]!.html?.includes('전문가 답변 전문'));
       let detail = (await admin.get(`/api/v1/admin/emails/${delivery.id}`).expect(200)).body.data;
       assert.equal(detail.status, 'SENT');
       assert.equal(detail.attempts[0].status, 'SENT');
@@ -266,7 +270,8 @@ test(
         data: { status: 'SENDING', retryCount: 1, attemptCount: 7, leaseUntil: new Date(0) },
       });
       await db.answerEmailAttempt.create({ data: { deliveryId: delivery.id, attemptNo: 7 } });
-      await Promise.all([processAnswerEmail(db, provider), processAnswerEmail(db, provider)]);
+      await processAnswerEmail(db, provider);
+      await processAnswerEmail(db, provider);
       assert.equal(sent.length, 2);
       detail = (await admin.get(`/api/v1/admin/emails/${delivery.id}`).expect(200)).body.data;
       assert.equal(detail.status, 'SENT');
@@ -334,18 +339,18 @@ test('H-ERP SMTP adapter delivers real SMTP DATA to a local test server', async 
     await provider.send({
       recipient: 'reader@example.com',
       subject: 'Answer notification',
+      html: '<h1>AI QAVER</h1><p>Full answer</p>',
       text: 'Full answer\nhttps://search.aiqaver.com/#answer=test',
       messageKey: randomUUID(),
     });
     assert.ok(received.includes('To: reader@example.com'));
     assert.ok(received.includes('AI QAVER'));
-    assert.ok(
-      received.includes(
-        Buffer.from('Full answer\nhttps://search.aiqaver.com/#answer=test')
-          .toString('base64')
-          .slice(0, 30),
-      ),
-    );
+    assert.ok(received.includes('multipart/alternative'));
+    assert.ok(received.includes('Content-Type: text/html'));
+    assert.ok(received.includes('Content-Type: text/plain'));
+    assert.ok(received.includes('Content-Transfer-Encoding: 7bit'));
+    assert.ok(received.includes('Full answer\r\nhttps://search.aiqaver.com/#answer=test'));
+    assert.ok(received.includes('<h1>AI QAVER</h1><p>Full answer</p>'));
   } finally {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
@@ -391,6 +396,7 @@ test('transport configuration and Resend redact provider errors', async () => {
       recipient: 'reader@example.com',
       subject: 'test',
       text: 'answer',
+      html: '<p>answer</p>',
       messageKey: randomUUID(),
     });
     assert.deepEqual(payload, {
@@ -398,6 +404,7 @@ test('transport configuration and Resend redact provider errors', async () => {
       to: ['reader@example.com'],
       subject: 'test',
       text: 'answer',
+      html: '<p>answer</p>',
     });
     globalThis.fetch = async () => new Response('sensitive echoed answer', { status: 429 });
     await assert.rejects(
@@ -458,4 +465,28 @@ test('answer email template sends the complete reply to the registered questione
   assert.ok(saved.body.includes('김전문'));
   const token = /https:\/\/search.aiqaver.com\/#answer=([a-f0-9]{64})/.exec(saved.body)![1]!;
   assert.equal(saved.linkTokenHash, tokenHash(token));
+});
+
+test('HTML template escapes content, retains full answers and uses the renewed action link', () => {
+  const body = `등록하신 질문에 김<전문>님이 답변했습니다.\n\n질문\n<script>alert("x")</script> & 질문\n\n답변\n첫 줄\n<img src=x onerror=alert(1)>\n${'긴 답변 '.repeat(1000)}\n\n답변 확인 링크 (30일간 유효)\nhttps://search.aiqaver.com/#answer=${'a'.repeat(64)}\n\n공유에 주의해 주세요.`;
+  const renewed = renewAnswerLink(body);
+  const html = renderAnswerEmail(renewed.body);
+  assert.ok(html.includes('https://search.aiqaver.com/brand/aiqaver-logo.png'));
+  assert.ok(html.includes('김&lt;전문&gt;'));
+  assert.ok(html.includes('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; 질문'));
+  assert.ok(html.includes('첫 줄<br>&lt;img src=x onerror=alert(1)&gt;'));
+  assert.ok(html.includes('긴 답변 '.repeat(1000)));
+  assert.ok(html.includes('공유에 주의해 주세요.'));
+  assert.ok(!html.includes('<script>'));
+  assert.ok(!html.includes('a'.repeat(64)));
+  const token = /#answer=([a-f0-9]{64})/.exec(renewed.body)![1]!;
+  assert.equal(
+    (html.match(new RegExp(`href="https://search.aiqaver.com/#answer=${token}"`, 'g')) ?? [])
+      .length,
+    2,
+  );
+  const unsafe = renderAnswerEmail(`원문\n\n답변 확인 링크 (30일간 유효)\njavascript:alert(1)`);
+  assert.ok(!unsafe.includes('href="javascript:'));
+  assert.ok(unsafe.includes('javascript:alert(1)'));
+  assert.ok(renderAnswerEmail('이전 메일\n전체 본문').includes('이전 메일<br>전체 본문'));
 });

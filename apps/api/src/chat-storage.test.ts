@@ -97,7 +97,27 @@ test(
       assert.equal(voiceCalls, 1, 'another browser cannot mint a token for this conversation');
       await client.post('/api/v1/voice/session').send({}).expect(200);
       assert.equal(voiceCalls, 2);
-      await client.post('/api/v1/chat').send({ question: 'first' }).expect(200);
+      const firstKey = '11111111-1111-4111-8111-111111111111';
+      const first = await client
+        .post('/api/v1/chat')
+        .send({ question: 'first', requestKey: firstKey })
+        .expect(200);
+      const replay = await client
+        .post('/api/v1/chat')
+        .send({ question: 'first', requestKey: firstKey })
+        .expect(200);
+      assert.deepEqual(replay.body.data, first.body.data);
+      assert.equal(await db.chatMessage.count(), 2);
+      assert.equal(
+        (await db.chatSession.findUniqueOrThrow({ where: { id: first.body.data.sessionId } }))
+          .questionCount,
+        1,
+      );
+      const conflict = await client
+        .post('/api/v1/chat')
+        .send({ question: 'different', requestKey: firstKey })
+        .expect(409);
+      assert.equal(conflict.body.error.code, 'REQUEST_KEY_CONFLICT');
       await client
         .post('/api/v1/chat')
         .send({ question: 'second', history: [{ question: 'forged', answer: 'forged' }] })
@@ -120,9 +140,25 @@ test(
         .set('Cookie', cookie)
         .expect(200);
       assert.equal(restored.body.data.messages.length, 4);
+      const restartedReplay = await request(restarted)
+        .post('/api/v1/chat')
+        .set('Cookie', cookie)
+        .send({ question: 'first', requestKey: firstKey, sessionId: session.id })
+        .expect(200);
+      assert.equal(restartedReplay.body.data.answerMessageId, first.body.data.answerMessageId);
+      assert.equal(await db.chatMessage.count(), 4);
       const stranger = await request(app).get('/api/v1/chat/history').expect(200);
       assert.equal(stranger.body.data.messages.length, 0);
-      await client.post('/api/v1/chat').send({ question: 'fail' }).expect(502);
+      const failedKey = '22222222-2222-4222-8222-222222222222';
+      await client
+        .post('/api/v1/chat')
+        .send({ question: 'fail', requestKey: failedKey })
+        .expect(502);
+      const failedReplay = await client
+        .post('/api/v1/chat')
+        .send({ question: 'fail', requestKey: failedKey })
+        .expect(409);
+      assert.equal(failedReplay.body.error.code, 'QUESTION_FAILED');
       assert.equal(
         (await db.chatSession.findUniqueOrThrow({ where: { id: session.id } })).questionCount,
         2,
@@ -136,11 +172,17 @@ test(
       const started = new Promise<void>((resolve) => {
         entered = resolve;
       });
+      const pendingKey = '33333333-3333-4333-8333-333333333333';
       const pending = client
         .post('/api/v1/chat')
-        .send({ question: 'wait' })
+        .send({ question: 'wait', requestKey: pendingKey })
         .then((r) => r);
       await started;
+      const pendingReplay = await client
+        .post('/api/v1/chat')
+        .send({ question: 'wait', requestKey: pendingKey })
+        .expect(409);
+      assert.equal(pendingReplay.body.error.code, 'QUESTION_IN_PROGRESS');
       await client.post('/api/v1/chat').send({ question: 'racing' }).expect(409);
       release?.();
       assert.equal((await pending).status, 200);
@@ -160,12 +202,64 @@ test(
       assert.equal(unsaved.body.error.code, 'DATABASE_UNAVAILABLE');
       assert.equal(await db.chatMessage.count({ where: { content: 'answer:reject-save' } }), 0);
 
+      const recoveryClient = request.agent(app);
+      const recoverySession = (await recoveryClient.get('/api/v1/chat/history').expect(200)).body
+        .data.sessionId;
+      const abandonedKey = '44444444-4444-4444-8444-444444444444';
+      const abandoned = await storage.begin(recoverySession, 'interrupted', true, abandonedKey);
+      assert.ok(abandoned.message);
+      await db.chatMessage.update({
+        where: { id: abandoned.message.id },
+        data: { createdAt: new Date(Date.now() - 180000) },
+      });
+      const abandonedReplay = await recoveryClient
+        .post('/api/v1/chat')
+        .send({ question: 'interrupted', requestKey: abandonedKey })
+        .expect(409);
+      assert.equal(abandonedReplay.body.error.code, 'QUESTION_FAILED');
+      assert.equal(
+        (await db.chatSession.findUniqueOrThrow({ where: { id: recoverySession } })).questionCount,
+        0,
+      );
+      assert.equal(
+        (await db.chatMessage.findUniqueOrThrow({ where: { id: abandoned.message.id } }))
+          .processingStatus,
+        'FAILED',
+      );
+      await recoveryClient
+        .post('/api/v1/chat')
+        .send({ question: 'interrupted', requestKey: '55555555-5555-4555-8555-555555555555' })
+        .expect(200);
+      assert.equal(await db.chatMessage.count({ where: { sessionId: recoverySession } }), 3);
+      assert.equal(
+        (await db.chatSession.findUniqueOrThrow({ where: { id: recoverySession } })).questionCount,
+        1,
+      );
+
       // Exercise the initial BO release against the same isolated PostgreSQL database.
       const reviewApp = createApp(
         'Test',
-        async () => ({ answer: '검증할 AI 답변', isLegalQuestion: true }),
+        async ({ question }) => ({
+          answer: '검증할 AI 답변',
+          isLegalQuestion: question !== '비법률 질문',
+        }),
         { storage, db },
       );
+      const nonLegalRequester = request.agent(reviewApp);
+      const nonLegal = await nonLegalRequester
+        .post('/api/v1/chat')
+        .send({ question: '비법률 질문' })
+        .expect(200);
+      assert.equal(nonLegal.body.data.isLegalQuestion, false);
+      await nonLegalRequester
+        .post('/api/v1/reviews')
+        .send({
+          answerMessageId: nonLegal.body.data.answerMessageId,
+          email: 'nonlegal@example.com',
+          consent: true,
+        })
+        .expect(404);
+      assert.equal(await db.reviewBoardPost.count(), 0);
       const requester = request.agent(reviewApp);
       const expert = request.agent(reviewApp);
       const otherExpert = request.agent(reviewApp);
@@ -298,6 +392,16 @@ test(
         (await requester.post('/api/v1/reviews').send(payload).expect(201)).body.data.id,
         postId,
       );
+      const changedEmail = await requester
+        .post('/api/v1/reviews')
+        .send({ ...payload, email: 'changed@example.com' })
+        .expect(409);
+      assert.equal(changedEmail.body.error.code, 'REVIEW_ERROR');
+      assert.equal(
+        (await db.reviewBoardPost.findUniqueOrThrow({ where: { id: postId } })).requesterEmail,
+        payload.email,
+      );
+      assert.equal(await db.reviewBoardPost.count(), 1);
       const listing = await expert.get('/api/v1/bo/reviews').expect(200);
       assert.equal(listing.body.data.total, 1);
       const detail = await expert.get(`/api/v1/bo/reviews/${postId}`).expect(200);

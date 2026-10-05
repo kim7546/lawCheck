@@ -3,6 +3,7 @@ export interface OutgoingEmail {
   recipient: string;
   subject: string;
   text: string;
+  html?: string;
   messageKey: string;
 }
 export interface EmailProvider {
@@ -58,6 +59,7 @@ export function createEmailProvider(env: NodeJS.ProcessEnv): EmailProvider | und
               to: [message.recipient],
               subject: message.subject,
               text: message.text,
+              html: message.html,
             }),
             signal: AbortSignal.timeout(30000),
           });
@@ -124,6 +126,7 @@ export function createEmailProvider(env: NodeJS.ProcessEnv): EmailProvider | und
           to: message.recipient,
           subject: message.subject,
           text: message.text,
+          html: message.html,
           textEncoding: 'base64',
           messageId: `<${message.messageKey}@${from.split('@')[1]}>`,
         });

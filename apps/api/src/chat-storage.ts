@@ -19,14 +19,14 @@ export class ChatStorage {
       throw new ChatError(503, 'OFFICE_UNAVAILABLE', '사무실 설정을 확인해 주세요.');
     return this.browserHistory.session(req, res, office.id, limited, reset);
   }
-  async begin(sessionId: string, question: string, limited: boolean) {
-    return this.db.$transaction(async (tx) => {
+  async begin(sessionId: string, question: string, limited: boolean, requestKey?: string) {
+    const result = await this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM chat_sessions WHERE id = ${sessionId}::uuid FOR UPDATE`;
       const session = await tx.chatSession.findUniqueOrThrow({ where: { id: sessionId } });
       if (session.expiresAt <= new Date())
         throw new ChatError(401, 'SESSION_EXPIRED', '대화 세션이 만료됐어요. 새로고침해 주세요.');
-      // A process can stop while calling the model. Release abandoned requests after
-      // two minutes (the upstream timeout is 60 seconds), retaining their history.
+      // Commit recovery even when the caller replays the abandoned request key.
+      // The upstream timeout is 60 seconds; two minutes also covers process stops.
       const stale = await tx.chatMessage.updateMany({
         where: {
           sessionId,
@@ -37,14 +37,53 @@ export class ChatStorage {
         data: { processingStatus: 'FAILED' },
       });
       const used = Math.max(0, session.questionCount - stale.count);
+      if (stale.count)
+        await tx.chatSession.update({ where: { id: sessionId }, data: { questionCount: used } });
+      if (requestKey) {
+        const existing = await tx.chatMessage.findUnique({
+          where: { sessionId_requestKey: { sessionId, requestKey } },
+          include: { children: { where: { role: 'ASSISTANT' }, take: 1 } },
+        });
+        if (existing) {
+          if (existing.content !== question)
+            return {
+              error: new ChatError(409, 'REQUEST_KEY_CONFLICT', '질문을 다시 확인해 주세요.'),
+            };
+          const answer = existing.children[0];
+          if (existing.processingStatus === 'COMPLETED' && answer)
+            return {
+              completed: {
+                answer: answer.content,
+                isLegalQuestion: answer.messageType === 'AI_ANSWER',
+                answerMessageId: answer.id,
+              },
+              used,
+            };
+          return {
+            error: new ChatError(
+              409,
+              existing.processingStatus === 'PROCESSING'
+                ? 'QUESTION_IN_PROGRESS'
+                : 'QUESTION_FAILED',
+              existing.processingStatus === 'PROCESSING'
+                ? '이전 질문의 답변을 기다려 주세요.'
+                : '이 질문의 답변이 실패했어요. 다시 질문해 주세요.',
+            ),
+          };
+        }
+      }
       if (await tx.chatMessage.count({ where: { sessionId, processingStatus: 'PROCESSING' } }))
-        throw new ChatError(409, 'QUESTION_IN_PROGRESS', '이전 질문의 답변을 기다려 주세요.');
+        return {
+          error: new ChatError(409, 'QUESTION_IN_PROGRESS', '이전 질문의 답변을 기다려 주세요.'),
+        };
       if (limited && used >= 3)
-        throw new ChatError(
-          429,
-          'QUESTION_LIMIT_REACHED',
-          '이번 대화의 질문 3회를 모두 사용했어요. 새 대화를 시작해 주세요.',
-        );
+        return {
+          error: new ChatError(
+            429,
+            'QUESTION_LIMIT_REACHED',
+            '이번 대화의 질문 3회를 모두 사용했어요. 새 대화를 시작해 주세요.',
+          ),
+        };
       const previous = await tx.chatMessage.findMany({
         where: { sessionId, role: 'ASSISTANT', processingStatus: 'COMPLETED' },
         orderBy: { sequenceNo: 'desc' },
@@ -65,6 +104,7 @@ export class ChatStorage {
           role: 'USER',
           messageType: 'USER_QUESTION',
           content: question,
+          requestKey,
           sequenceNo: (last._max.sequenceNo ?? 0) + 1,
           processingStatus: 'PROCESSING',
         },
@@ -73,8 +113,10 @@ export class ChatStorage {
         where: { id: sessionId },
         data: { questionCount: used + 1, maxQuestionCount: limited ? 3 : null },
       });
-      return { message, history, used: used + 1 };
+      return { message, history, used: used + 1, completed: undefined };
     });
+    if (result.error) throw result.error;
+    return result;
   }
 
   async complete(sessionId: string, messageId: string, answer: ChatAnswer) {

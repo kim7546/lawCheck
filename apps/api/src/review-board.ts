@@ -360,6 +360,7 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
         id: answerMessageId,
         sessionId: { in: ownedIds },
         role: 'ASSISTANT',
+        messageType: 'AI_ANSWER',
         processingStatus: 'COMPLETED',
       },
       include: { parent: true },
@@ -376,6 +377,8 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
         requesterEmail: email.trim().toLowerCase(),
       },
     });
+    if (post.requesterEmail !== email.trim().toLowerCase())
+      throw fail(409, '이미 다른 이메일로 검증을 요청했습니다.');
     res.status(201).json({ success: true, data: { id: post.id } });
   });
   router.get('/reviews', async (req, res) => {

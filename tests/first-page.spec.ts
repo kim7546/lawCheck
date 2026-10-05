@@ -137,6 +137,7 @@ test('pending question appears immediately, reply follows and history is sent', 
   await expect(page.locator('.assistant-body > p').last()).toHaveText('첫 답변\n다음 줄');
   expect(requests[1]).toEqual({
     question: '후속 질문',
+    requestKey: expect.any(String),
     history: [{ question: '첫 질문', answer: '첫 답변\n다음 줄' }],
   });
 });
@@ -165,6 +166,59 @@ test('failed answer restores question for retry and does not consume quota', asy
   );
   await page.getByRole('button', { name: '질문 보내기' }).click();
   await expect(page.getByText('재시도 성공')).toBeVisible();
+});
+
+test('chat retries retain their key, adopt the server session and reset after failure or a new chat', async ({
+  page,
+}) => {
+  const requests: { question: string; requestKey: string; sessionId?: string }[] = [];
+  const sessionId = '00000000-0000-4000-8000-000000000099';
+  await page.route('**/api/v1/chat', async (route) => {
+    requests.push(route.request().postDataJSON());
+    if (requests.length === 1) return route.abort('connectionreset');
+    if (requests.length === 3)
+      return route.fulfill({
+        status: 409,
+        json: {
+          success: false,
+          error: { code: 'QUESTION_FAILED', message: '다시 질문해 주세요.' },
+        },
+      });
+    await route.fulfill({
+      json: {
+        success: true,
+        data: { answer: `답변 ${requests.length}`, sessionId, remainingQuestions: 3 },
+      },
+    });
+  });
+  await page.goto('/');
+  const input = page.getByRole('textbox', { name: '질문', exact: true });
+  const send = page.getByRole('button', { name: '질문 보내기' });
+  await input.fill('재전송할 질문');
+  await send.click();
+  await expect(input).toHaveValue('재전송할 질문');
+  await send.click();
+  await expect(page.locator('.assistant-body > p').last()).toHaveText('답변 2');
+  expect(requests[0]!.requestKey).toMatch(/^[0-9a-f-]{36}$/);
+  expect(requests[1]!.requestKey).toBe(requests[0]!.requestKey);
+  expect(requests[1]!.sessionId).toBeUndefined();
+  await input.fill('재전송할 질문');
+  await send.click();
+  await expect(input).toHaveValue('재전송할 질문');
+  expect(requests[2]!.requestKey).not.toBe(requests[1]!.requestKey);
+  expect(requests[2]!.sessionId).toBe(sessionId);
+  await send.click();
+  await expect(page.locator('.assistant-body > p').last()).toHaveText('답변 4');
+  expect(requests[3]!.requestKey).not.toBe(requests[2]!.requestKey);
+  const menu = page.getByRole('button', { name: '대화 메뉴 열기' });
+  if (await menu.isVisible()) await menu.click();
+  await page.locator('.brand-logo').click();
+  await expect(input).toHaveValue('');
+  await input.fill('재전송할 질문');
+  await send.click();
+  await expect(page.locator('.assistant-body > p').last()).toHaveText('답변 5');
+  expect(requests[4]!.requestKey).not.toBe(requests[3]!.requestKey);
+  expect(requests[4]!.sessionId).toBeUndefined();
 });
 
 test.beforeEach(async ({ page }) => {

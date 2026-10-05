@@ -157,11 +157,14 @@ export function createApp(
     });
   });
   app.post('/api/v1/chat', async (req, res) => {
-    const { question, history = [] } = req.body ?? {};
+    const { question, history = [], requestKey } = req.body ?? {};
     if (
       typeof question !== 'string' ||
       !question.trim() ||
       question.length > 2000 ||
+      (requestKey !== undefined &&
+        (typeof requestKey !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestKey))) ||
       !Array.isArray(history) ||
       history.some(
         (turn: ChatRequest['history'][number]) =>
@@ -188,7 +191,23 @@ export function createApp(
         req.body?.sessionId !== undefined
           ? await storage.browserHistory.ownedSession(req, res, String(req.body.sessionId))
           : await storage.session(req, res, questionLimitEnabled);
-      const pending = await storage.begin(session.id, question.trim(), questionLimitEnabled);
+      const pending = await storage.begin(
+        session.id,
+        question.trim(),
+        questionLimitEnabled,
+        requestKey,
+      );
+      if (pending.completed) {
+        res.json({
+          success: true,
+          data: {
+            ...pending.completed,
+            sessionId: session.id,
+            remainingQuestions: questionLimitEnabled ? Math.max(0, 3 - pending.used) : null,
+          },
+        });
+        return;
+      }
       let answer;
       try {
         answer = await generateAnswer({ question: question.trim(), history: pending.history });

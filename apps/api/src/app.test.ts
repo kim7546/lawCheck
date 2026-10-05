@@ -53,6 +53,7 @@ test('invalid chat inputs never invoke AI', async () => {
     { question: 'x'.repeat(2001) },
     { question: '질문', history: [null] },
     { question: '질문', history: 'invalid history' },
+    { question: '질문', requestKey: 'invalid-key' },
   ]) {
     assert.equal((await request(app).post('/api/v1/chat').send(body)).status, 400);
   }

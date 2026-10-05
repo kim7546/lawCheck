@@ -226,6 +226,9 @@ function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
   const composer = useRef<HTMLTextAreaElement>(null);
   const latestTurn = useRef<HTMLElement>(null);
   const activeRequest = useRef<AbortController | null>(null);
+  const retryRequest = useRef<{ conversationId: string; question: string; key: string } | null>(
+    null,
+  );
   const sidebar = useRef<HTMLElement>(null);
   const sidebarLogo = useRef<HTMLButtonElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -399,6 +402,7 @@ function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
       setCurrentId(id);
       setTurns([]);
       setQuestion('');
+      retryRequest.current = null;
       setQuota(3);
       setSidebarOpen(false);
       void refreshMetadata();
@@ -429,6 +433,7 @@ function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
       currentIdRef.current = id;
       setCurrentId(id);
       setQuestion('');
+      retryRequest.current = null;
       setSidebarOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : '대화를 불러오지 못했어요.');
@@ -452,6 +457,10 @@ function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
     const text = question.trim();
     const id = crypto.randomUUID();
     const chatId = currentIdRef.current;
+    const retry = retryRequest.current;
+    const requestKey =
+      retry?.conversationId === chatId && retry.question === text ? retry.key : crypto.randomUUID();
+    retryRequest.current = { conversationId: chatId, question: text, key: requestKey };
     const controller = new AbortController();
     activeRequest.current = controller;
     const timeout = setTimeout(() => controller.abort(), 70000);
@@ -480,6 +489,7 @@ function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: text,
+          requestKey,
           history,
           ...(!chatId.startsWith('draft') ? { sessionId: chatId } : {}),
         }),
@@ -488,6 +498,8 @@ function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
       const body: ChatResponse = await response.json();
       if (!body.success) {
         if (body.error.code === 'QUESTION_LIMIT_REACHED') setQuota(0);
+        if (body.error.code === 'QUESTION_FAILED' || body.error.code === 'REQUEST_KEY_CONFLICT')
+          retryRequest.current = null;
         throw new Error(body.error.message);
       }
       if (!response.ok || !body.data.answer?.trim())
@@ -515,6 +527,7 @@ function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
           ),
         );
       }
+      retryRequest.current = null;
       void refreshMetadata();
     } catch (e) {
       const message = controller.signal.aborted

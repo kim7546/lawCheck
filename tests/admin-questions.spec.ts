@@ -106,6 +106,7 @@ test('admin question menus show full answers, filter periods, paginate and displ
     '운영 요약',
     '질문현황',
     '통계',
+    '이메일 발송이력',
     '사용자 관리',
     '공통코드 관리',
     'BO 메뉴 관리',
