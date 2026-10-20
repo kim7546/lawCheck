@@ -112,7 +112,7 @@ export class FoHistory {
         },
         select: { contribution: { select: { post: { select: { sessionId: true } } } } },
       });
-      if (!delivery) throw invalid();
+      if (!delivery?.contribution) throw invalid();
       const sessionId = delivery.contribution.post.sessionId;
       const session = await tx.chatSession.findFirst({
         where: { id: sessionId, lawOffice: { isActive: true } },

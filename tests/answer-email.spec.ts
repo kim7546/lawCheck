@@ -1,10 +1,46 @@
 import { test, expect } from '@playwright/test';
 import type { AdminEmailDetail } from '@lawcheck/contracts';
 
+test('admin distinguishes lawyer request notifications without answer expiry', async ({ page }) => {
+  const delivery: AdminEmailDetail = {
+    kind: 'REVIEW_REQUEST',
+    id: '00000000-0000-4000-8000-000000000003',
+    contributionId: null,
+    recipient: 'lawyer@example.com',
+    subject: '[AI QAVER] 검증을 원하는 질문이 등록되었습니다',
+    body: '검증을 원하는 질문이 등록되었습니다.\n\n질문\n질문 전문\n\nOffice에서 검증하기\nhttps://office.aiqaver.com/',
+    status: 'QUEUED',
+    attemptCount: 0,
+    version: 1,
+    lastErrorCode: null,
+    createdAt: '2026-10-20T01:00:00Z',
+    sentAt: null,
+    nextAttemptAt: '2026-10-20T01:00:00Z',
+    linkExpiresAt: null,
+    attempts: [],
+  };
+  await page.route('**/api/v1/admin/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    const data = pathname.endsWith('/me')
+      ? { id: 'admin', name: '관리자', email: 'admin@example.com' }
+      : pathname.endsWith(`/${delivery.id}`)
+        ? delivery
+        : { items: [delivery], total: 1, page: 1, pageSize: 20 };
+    await route.fulfill({ json: { success: true, data } });
+  });
+  await page.goto('http://127.0.0.1:5175/#emails');
+  await expect(page.getByRole('cell', { name: '검증 요청 알림', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'lawyer@example.com 발송 상세' }).click();
+  await expect(page.locator('.admin-email-body')).toContainText('https://office.aiqaver.com/');
+  await expect(page.getByRole('term').filter({ hasText: '답변 링크 만료' })).toHaveCount(0);
+  await expect(page.getByText('아직 발송 시도가 없습니다.')).toBeVisible();
+});
+
 test('admin email history searches, shows attempts, retries failure and recovers errors', async ({
   page,
 }) => {
   const delivery: AdminEmailDetail = {
+    kind: 'ANSWER',
     id: '00000000-0000-4000-8000-000000000001',
     contributionId: '00000000-0000-4000-8000-000000000002',
     recipient: 'questioner@example.com',

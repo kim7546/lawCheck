@@ -5,6 +5,7 @@ const fail = (status: number, message: string) => new ChatError(status, 'ADMIN_E
 const statuses = ['QUEUED', 'SENDING', 'RETRY', 'SENT', 'FAILED'];
 const selection = {
   id: true,
+  kind: true,
   contributionId: true,
   recipient: true,
   subject: true,

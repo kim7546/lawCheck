@@ -10,6 +10,7 @@ const statuses: Record<AnswerEmailStatus, string> = {
 };
 const date = (value: string | null) =>
   value ? new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—';
+const kindLabel = (kind: string) => (kind === 'REVIEW_REQUEST' ? '검증 요청 알림' : '답변 알림');
 export function AdminEmails({ onError }: { onError: (error: unknown) => void }) {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState({ q: '', status: '', from: '', to: '' });
@@ -69,6 +70,8 @@ export function AdminEmails({ onError }: { onError: (error: unknown) => void }) 
           {detail && (
             <>
               <dl>
+                <dt>종류</dt>
+                <dd>{kindLabel(detail.kind)}</dd>
                 <dt>수신 이메일</dt>
                 <dd>{detail.recipient}</dd>
                 <dt>제목</dt>
@@ -81,8 +84,12 @@ export function AdminEmails({ onError }: { onError: (error: unknown) => void }) 
                 <dd>{date(detail.sentAt)}</dd>
                 <dt>최근 오류</dt>
                 <dd>{detail.lastErrorCode ?? '—'}</dd>
-                <dt>답변 링크 만료</dt>
-                <dd>{date(detail.linkExpiresAt)}</dd>
+                {detail.linkExpiresAt && (
+                  <>
+                    <dt>답변 링크 만료</dt>
+                    <dd>{date(detail.linkExpiresAt)}</dd>
+                  </>
+                )}
               </dl>
               <h3>발송 본문</h3>
               <pre className="admin-email-body">{detail.body}</pre>
@@ -209,6 +216,7 @@ export function AdminEmails({ onError }: { onError: (error: unknown) => void }) 
                 <table>
                   <thead>
                     <tr>
+                      <th>종류</th>
                       <th>수신 이메일</th>
                       <th>제목</th>
                       <th>상태</th>
@@ -221,6 +229,7 @@ export function AdminEmails({ onError }: { onError: (error: unknown) => void }) 
                   <tbody>
                     {data.items.map((item) => (
                       <tr key={item.id}>
+                        <td>{kindLabel(item.kind)}</td>
                         <td>{item.recipient}</td>
                         <td>{item.subject}</td>
                         <td>{statuses[item.status]}</td>

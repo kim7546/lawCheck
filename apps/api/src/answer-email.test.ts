@@ -18,7 +18,229 @@ import {
   enqueueAnswerEmail,
 } from './answer-email.js';
 import { createEmailProvider, EmailTransportError, type OutgoingEmail } from './email-provider.js';
-import { renderAnswerEmail } from './email-template.js';
+import { renderAnswerEmail, renderReviewRequestEmail } from './email-template.js';
+import { officeOrigin } from './review-request-email.js';
+
+test(
+  'review requests notify active lawyers once, atomically, with retryable private emails',
+  { timeout: 60000 },
+  async () => {
+    const pg = new PGlite({ extensions: { btree_gist } });
+    const socket = new PGLiteSocketServer({ db: pg, host: '127.0.0.1', port: 0 });
+    let db: PrismaClient | undefined;
+    try {
+      const base = new URL('../prisma/migrations/', import.meta.url);
+      for (const entry of (await readdir(base, { withFileTypes: true }))
+        .filter((e) => e.isDirectory())
+        .sort((a, b) => a.name.localeCompare(b.name)))
+        await pg.exec(await readFile(new URL(`${entry.name}/migration.sql`, base), 'utf8'));
+      await socket.start();
+      db = new PrismaClient({
+        datasources: {
+          db: {
+            url: `postgresql://postgres:postgres@${socket.getServerConn()}/postgres?connection_limit=1&sslmode=disable`,
+          },
+        },
+      });
+      await db.lawOffice.create({ data: { code: 'LAW001', name: 'Test' } });
+      const salt = 'a'.repeat(32),
+        password = 'test-password-123';
+      const passwordHash = `${salt}:${scryptSync(password, salt, 64).toString('hex')}`;
+      const lawyer = await db.expertAccount.create({
+        data: {
+          email: 'lawyer-one@example.com',
+          name: '변호사1',
+          expertGroup: 'LAWYER',
+          passwordHash,
+          adminProfile: { create: {} },
+        },
+      });
+      await db.expertAccount.createMany({
+        data: [
+          { email: 'lawyer-two@example.com', name: '변호사2', expertGroup: 'LAWYER', passwordHash },
+          {
+            email: 'inactive@example.com',
+            name: '중지 변호사',
+            expertGroup: 'LAWYER',
+            isActive: false,
+            passwordHash,
+          },
+          { email: 'tax@example.com', name: '세무사', expertGroup: 'TAX_ACCOUNTANT', passwordHash },
+          { email: 'admin-only@example.com', name: '직역 없는 관리자', passwordHash },
+        ],
+      });
+      const app = createApp('Test', async () => ({ answer: 'AI 답변', isLegalQuestion: true }), {
+        db,
+        storage: new ChatStorage(db),
+      });
+      const requester = request.agent(app),
+        admin = request.agent(app);
+      const question = ('<script>alert("x")</script> & 질문\n' + '질문 전문 '.repeat(150)).trim();
+      const chat = await requester.post('/api/v1/chat').send({ question }).expect(200);
+      const payload = {
+        answerMessageId: chat.body.data.answerMessageId,
+        email: 'private-requester@example.com',
+        consent: true,
+      };
+      await requester
+        .post('/api/v1/reviews')
+        .send({ ...payload, consent: false })
+        .expect(400);
+      await request(app).post('/api/v1/reviews').send(payload).expect(404);
+      assert.equal(await db.answerEmailDelivery.count(), 0);
+
+      // If any recipient cannot be queued, the question request rolls back too.
+      await pg.exec(
+        "CREATE FUNCTION fail_request_email() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test'; END; $$; CREATE TRIGGER fail_request_email BEFORE INSERT ON answer_email_deliveries FOR EACH ROW EXECUTE FUNCTION fail_request_email()",
+      );
+      await requester.post('/api/v1/reviews').send(payload).expect(503);
+      assert.equal(await db.reviewBoardPost.count(), 0);
+      assert.equal(await db.answerEmailDelivery.count(), 0);
+      await pg.exec(
+        'DROP TRIGGER fail_request_email ON answer_email_deliveries; DROP FUNCTION fail_request_email()',
+      );
+
+      const responses = await Promise.all([
+        requester.post('/api/v1/reviews').send(payload).expect(201),
+        requester.post('/api/v1/reviews').send(payload).expect(201),
+      ]);
+      assert.equal(responses[0]!.body.data.id, responses[1]!.body.data.id);
+      const deliveries = await db.answerEmailDelivery.findMany({ orderBy: { recipient: 'asc' } });
+      assert.deepEqual(
+        deliveries.map((d) => d.recipient),
+        ['lawyer-one@example.com', 'lawyer-two@example.com'],
+      );
+      for (const delivery of deliveries) {
+        assert.equal(delivery.kind, 'REVIEW_REQUEST');
+        assert.equal(delivery.requestPostId, responses[0]!.body.data.id);
+        assert.equal(delivery.contributionId, null);
+        assert.equal(delivery.linkTokenHash, null);
+        assert.equal(delivery.linkExpiresAt, null);
+        assert.ok(delivery.body.includes(question));
+        assert.ok(delivery.body.includes(`${officeOrigin()}/`));
+        assert.ok(!delivery.body.includes(payload.email));
+      }
+      assert.equal(deliveries[0]!.requestExpertId, lawyer.id);
+      await requester
+        .post('/api/v1/reviews')
+        .send({ ...payload, email: 'changed@example.com' })
+        .expect(409);
+      await db.expertAccount.create({
+        data: {
+          email: 'late-lawyer@example.com',
+          name: '나중 가입',
+          expertGroup: 'LAWYER',
+          passwordHash,
+        },
+      });
+      await requester.post('/api/v1/reviews').send(payload).expect(201);
+      assert.equal(await db.answerEmailDelivery.count(), 2);
+      assert.equal(await processAnswerEmail(db), false);
+
+      const sent: OutgoingEmail[] = [];
+      const provider = {
+        send: async (mail: OutgoingEmail) => {
+          sent.push(mail);
+        },
+      };
+      await processAnswerEmail(db, provider);
+      await processAnswerEmail(db, provider);
+      assert.equal(await processAnswerEmail(db, provider), false);
+      assert.equal(sent.length, 2);
+      for (const mail of sent) {
+        assert.equal(mail.subject, '[AI QAVER] 검증을 원하는 질문이 등록되었습니다');
+        assert.ok(mail.text.includes(question));
+        assert.ok(mail.html?.includes('&lt;script&gt;'));
+        assert.ok(!mail.html?.includes('<script>'));
+        assert.ok(mail.html?.includes(`href="${officeOrigin()}/"`));
+        assert.ok(mail.html?.includes('Office에서 검증하기'));
+        assert.ok(mail.html?.includes('alt="AI QAVER"'));
+        assert.ok(!mail.html?.includes('#answer='));
+      }
+      await admin
+        .post('/api/v1/admin/login')
+        .send({ identifier: lawyer.email, password })
+        .expect(200);
+      const list = (await admin.get('/api/v1/admin/emails').expect(200)).body.data;
+      assert.equal(list.total, 2);
+      assert.ok(list.items.every((item: { kind: string }) => item.kind === 'REVIEW_REQUEST'));
+      const deliveryId = deliveries[0]!.id;
+      await db.answerEmailDelivery.update({
+        where: { id: deliveryId },
+        data: { status: 'QUEUED', retryCount: 0 },
+      });
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        await db.answerEmailDelivery.update({
+          where: { id: deliveryId },
+          data: { nextAttemptAt: new Date(0) },
+        });
+        await processAnswerEmail(db, {
+          send: async () => {
+            throw new EmailTransportError('CONNECTION');
+          },
+        });
+      }
+      const failed = (await admin.get(`/api/v1/admin/emails/${deliveryId}`).expect(200)).body.data;
+      assert.equal(failed.status, 'FAILED');
+      assert.equal(failed.lastErrorCode, 'CONNECTION');
+      assert.equal(failed.linkExpiresAt, null);
+      assert.equal(failed.attempts.length, 6);
+      await admin
+        .post(`/api/v1/admin/emails/${deliveryId}/retry`)
+        .send({ version: failed.version })
+        .expect(200);
+      await processAnswerEmail(db, provider);
+      assert.equal(
+        (await db.answerEmailDelivery.findUniqueOrThrow({ where: { id: deliveryId } })).status,
+        'SENT',
+      );
+      assert.equal(sent.length, 3);
+
+      await db.expertAccount.updateMany({
+        where: { expertGroup: 'LAWYER' },
+        data: { isActive: false },
+      });
+      const noRecipients = await requester
+        .post('/api/v1/chat')
+        .send({ question: '변호사가 없는 경우' })
+        .expect(200);
+      await requester
+        .post('/api/v1/reviews')
+        .send({ ...payload, answerMessageId: noRecipients.body.data.answerMessageId })
+        .expect(201);
+      assert.equal(await db.reviewBoardPost.count(), 2);
+      assert.equal(await db.answerEmailDelivery.count(), 2);
+    } finally {
+      await db?.$disconnect();
+      await socket.stop();
+      await pg.close();
+    }
+  },
+);
+
+test('Office email URLs require HTTPS in production and malformed snapshots remain safe', () => {
+  assert.equal(officeOrigin({ NODE_ENV: 'production' }), 'https://office.aiqaver.com');
+  assert.equal(officeOrigin({}), 'http://localhost:5174');
+  assert.equal(
+    officeOrigin({ BO_PUBLIC_URL: 'https://office.example.com/path' }),
+    'https://office.example.com',
+  );
+  for (const BO_PUBLIC_URL of [
+    '',
+    'not-a-url',
+    'http://office.example.com',
+    'javascript:alert(1)',
+    'https://user:password@office.example.com',
+  ])
+    assert.throws(
+      () => officeOrigin({ NODE_ENV: 'production', BO_PUBLIC_URL }),
+      /CONFIG: BO_PUBLIC_URL/,
+    );
+  const malformed = '<img src=x onerror=alert(1)>\n\nOffice에서 검증하기\njavascript:alert(1)';
+  const html = renderReviewRequestEmail(malformed);
+  assert.ok(html.includes('&lt;img'));
+  assert.ok(!html.includes('href="javascript:'));
+});
 
 test(
   'answer completion queues atomically; sending, retries, leases, links and admin history',

@@ -6,6 +6,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import type { ChatStorage } from './chat-storage.js';
 import { ChatError } from './chat.js';
 import { answerOrigin, enqueueAnswerEmail, tokenHash } from './answer-email.js';
+import { enqueueReviewRequestEmails, officeOrigin } from './review-request-email.js';
 import { communityRouter } from './community.js';
 import {
   getOfficeSignupPolicy,
@@ -42,6 +43,7 @@ const tokenFrom = (req: Request) =>
 
 export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
   const origin = answerOrigin();
+  const boOrigin = officeOrigin();
   const router = Router();
   const attempts = new Map<string, { count: number; expires: number }>();
   router.use((_req, res, next) => {
@@ -330,7 +332,7 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
         },
       },
     });
-    if (!delivery || delivery.linkExpiresAt <= new Date())
+    if (!delivery?.contribution || !delivery.linkExpiresAt || delivery.linkExpiresAt <= new Date())
       throw fail(404, '답변 링크가 유효하지 않거나 만료되었습니다.');
     res.json({
       success: true,
@@ -366,19 +368,25 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
       include: { parent: true },
     });
     if (!answer?.parent) throw fail(404, '현재 대화에서 검증할 답변을 찾을 수 없습니다.');
-    const post = await db.reviewBoardPost.upsert({
-      where: { answerMessageId },
-      update: {},
-      create: {
-        sessionId: answer.sessionId,
-        answerMessageId,
-        question: answer.parent.content,
-        aiAnswer: answer.content,
-        requesterEmail: email.trim().toLowerCase(),
-      },
+    const question = answer.parent.content;
+    const post = await db.$transaction(async (tx) => {
+      // ON CONFLICT prevents concurrent submissions from creating duplicate notifications.
+      const created = await tx.reviewBoardPost.createMany({
+        data: {
+          sessionId: answer.sessionId,
+          answerMessageId,
+          question,
+          aiAnswer: answer.content,
+          requesterEmail: email.trim().toLowerCase(),
+        },
+        skipDuplicates: true,
+      });
+      const post = await tx.reviewBoardPost.findUniqueOrThrow({ where: { answerMessageId } });
+      if (post.requesterEmail !== email.trim().toLowerCase())
+        throw fail(409, '이미 다른 이메일로 검증을 요청했습니다.');
+      if (created.count) await enqueueReviewRequestEmails(tx, post, boOrigin);
+      return post;
     });
-    if (post.requesterEmail !== email.trim().toLowerCase())
-      throw fail(409, '이미 다른 이메일로 검증을 요청했습니다.');
     res.status(201).json({ success: true, data: { id: post.id } });
   });
   router.get('/reviews', async (req, res) => {

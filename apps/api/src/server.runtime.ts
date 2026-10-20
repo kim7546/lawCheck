@@ -4,6 +4,7 @@ import { ChatStorage } from './chat-storage.js';
 import { startAnswerEmailWorker, answerOrigin } from './answer-email.js';
 import { createEmailProvider, EmailTransportError } from './email-provider.js';
 import { bootstrapAdmin } from './admin-bootstrap.js';
+import { officeOrigin } from './review-request-email.js';
 
 export interface ServerConfig {
   host: string;
@@ -47,6 +48,7 @@ export async function startServer(config: ServerConfig) {
   let provider;
   try {
     answerOrigin();
+    officeOrigin();
     provider = createEmailProvider(process.env);
     await bootstrapAdmin(db, process.env.ADMIN_EMAIL);
   } catch (error) {

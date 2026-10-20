@@ -6,6 +6,7 @@ import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist';
 const migrations = new URL('../apps/api/prisma/migrations/', import.meta.url);
 const db = new PGlite({ extensions: { btree_gist } });
 const renameSnapshots = [];
+let answerEmailSnapshot;
 try {
   const directories = (await readdir(migrations, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
@@ -99,7 +100,42 @@ try {
           ('00000000-0000-4000-8000-000000000003',gen_random_uuid(),gen_random_uuid(),'Q2','AI2','q@example.com','REVIEWING','00000000-0000-4000-8000-000000000001',NULL,NULL);
       `);
     }
+    if (directory === '202610200001_review_request_email') {
+      await db.exec(`
+        INSERT INTO answer_email_deliveries(id,contribution_id,recipient,subject,body,link_token_hash,link_expires_at,status,attempt_count,sent_at)
+          SELECT '00000000-0000-4000-8000-000000000021',id,'questioner@example.com','Existing subject','Existing body',repeat('e',64),'2030-01-01','SENT',1,now()
+          FROM review_contributions WHERE status='COMPLETED' LIMIT 1;
+        INSERT INTO answer_email_attempts(id,delivery_id,attempt_no,status,finished_at)
+          VALUES('00000000-0000-4000-8000-000000000022','00000000-0000-4000-8000-000000000021',1,'SENT',now());
+      `);
+      answerEmailSnapshot = {
+        deliveries: (await db.query('SELECT to_jsonb(t) AS data FROM answer_email_deliveries t'))
+          .rows,
+        attempts: (await db.query('SELECT to_jsonb(t) AS data FROM answer_email_attempts t')).rows,
+      };
+    }
     await db.exec(await readFile(new URL(`${directory}/migration.sql`, migrations), 'utf8'));
+    if (directory === '202610200001_review_request_email') {
+      assert.deepEqual(
+        (
+          await db.query(
+            "SELECT to_jsonb(t) - 'kind' - 'request_post_id' - 'request_expert_id' AS data FROM answer_email_deliveries t",
+          )
+        ).rows,
+        answerEmailSnapshot.deliveries,
+      );
+      assert.deepEqual(
+        (await db.query('SELECT to_jsonb(t) AS data FROM answer_email_attempts t')).rows,
+        answerEmailSnapshot.attempts,
+      );
+      assert.equal(
+        (await db.query('SELECT kind FROM answer_email_deliveries')).rows[0].kind,
+        'ANSWER',
+      );
+      await db.exec(
+        "DELETE FROM answer_email_attempts WHERE id='00000000-0000-4000-8000-000000000022'; DELETE FROM answer_email_deliveries WHERE id='00000000-0000-4000-8000-000000000021'",
+      );
+    }
     if (index === 0) {
       await db.exec(`INSERT INTO law_offices (id,code,name,is_active,updated_at)
         VALUES (gen_random_uuid(),'UPGRADE_TEST','Existing office',false,now())`);
@@ -306,7 +342,7 @@ try {
     WHERE n.nspname='public' AND c.relkind='r'
   `)
   ).rows;
-  assert.equal(descriptions.length, 284);
+  assert.equal(descriptions.length, 287);
   for (const row of descriptions) {
     assert.match(row.table_description ?? '', /[가-힣]/, row.table_name);
     assert.match(row.column_description ?? '', /[가-힣]/, `${row.table_name}.${row.column_name}`);

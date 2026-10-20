@@ -171,7 +171,8 @@ export type ChatResponse =
 export type AnswerEmailStatus = 'QUEUED' | 'SENDING' | 'RETRY' | 'SENT' | 'FAILED';
 export interface AdminEmail {
   id: string;
-  contributionId: string;
+  kind: 'ANSWER' | 'REVIEW_REQUEST';
+  contributionId: string | null;
   recipient: string;
   subject: string;
   status: AnswerEmailStatus;
@@ -184,7 +185,7 @@ export interface AdminEmail {
 }
 export interface AdminEmailDetail extends AdminEmail {
   body: string;
-  linkExpiresAt: string;
+  linkExpiresAt: string | null;
   attempts: {
     id: string;
     attemptNo: number;

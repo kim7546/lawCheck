@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { EmailTransportError, type EmailProvider } from './email-provider.js';
-import { renderAnswerEmail } from './email-template.js';
+import { renderAnswerEmail, renderReviewRequestEmail } from './email-template.js';
 
 export const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
 export function answerOrigin(env: NodeJS.ProcessEnv = process.env) {
@@ -86,7 +86,8 @@ export async function processAnswerEmail(
       });
       return null;
     }
-    const renewed = old.linkExpiresAt <= new Date() ? renewAnswerLink(old.body) : {};
+    const renewed =
+      old.linkExpiresAt && old.linkExpiresAt <= new Date() ? renewAnswerLink(old.body) : {};
     const delivery = await tx.answerEmailDelivery.update({
       where: { id: old.id },
       data: {
@@ -110,7 +111,10 @@ export async function processAnswerEmail(
       recipient: job.delivery.recipient,
       subject: job.delivery.subject,
       text: job.delivery.body,
-      html: renderAnswerEmail(job.delivery.body),
+      html:
+        job.delivery.kind === 'REVIEW_REQUEST'
+          ? renderReviewRequestEmail(job.delivery.body)
+          : renderAnswerEmail(job.delivery.body),
       messageKey: job.attempt.id,
     });
   } catch (error) {

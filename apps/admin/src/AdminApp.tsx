@@ -38,7 +38,7 @@ const sections = {
   },
   emails: {
     title: '이메일 발송이력',
-    description: '답변 알림의 발송 상태, 본문과 시도별 결과를 확인합니다.',
+    description: '검증 요청·답변 알림의 발송 상태, 본문과 시도별 결과를 확인합니다.',
     icon: Mail,
   },
   users: {

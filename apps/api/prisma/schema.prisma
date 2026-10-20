@@ -153,6 +153,7 @@ model ExpertAccount {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   sessions ExpertLoginSession[]
   contributions ReviewContribution[]
+  reviewRequestEmails AnswerEmailDelivery[] @relation("ReviewRequestRecipient")
   @@map("expert_accounts")
 }
 
@@ -240,6 +241,7 @@ model ExpertLoginSession {
 
 /// 검증 요청 게시글: 이용자가 검증을 요청한 질문과 인공지능 답변 원문
 model ReviewBoardPost {
+  requestEmails AnswerEmailDelivery[] @relation("ReviewRequestPost")
   /// 검증 요청 게시글 식별자
   id String @id @default(uuid()) @db.Uuid
   /// 채팅 세션 식별자
@@ -967,15 +969,18 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-/// 전문가 답변 알림: 답변 완료와 동일 트랜잭션으로 등록하는 발송 이력/대기열
+/// 검증 요청·전문가 답변 알림: 업무 저장과 동일 트랜잭션으로 등록하는 발송 이력/대기열
 model AnswerEmailDelivery {
   id String @id @default(uuid()) @db.Uuid
-  contributionId String @unique @map("contribution_id") @db.Uuid
+  kind String @default("ANSWER") @db.VarChar(30)
+  contributionId String? @unique @map("contribution_id") @db.Uuid
+  requestPostId String? @map("request_post_id") @db.Uuid
+  requestExpertId String? @map("request_expert_id") @db.Uuid
   recipient String @db.VarChar(254)
   subject String @db.VarChar(200)
   body String @db.Text
-  linkTokenHash String @unique @map("link_token_hash") @db.VarChar(64)
-  linkExpiresAt DateTime @map("link_expires_at") @db.Timestamptz(3)
+  linkTokenHash String? @unique @map("link_token_hash") @db.VarChar(64)
+  linkExpiresAt DateTime? @map("link_expires_at") @db.Timestamptz(3)
   status AnswerEmailStatus @default(QUEUED)
   attemptCount Int @default(0) @map("attempt_count")
   retryCount Int @default(0) @map("retry_count")
@@ -985,8 +990,11 @@ model AnswerEmailDelivery {
   lastErrorCode String? @map("last_error_code") @db.VarChar(100)
   sentAt DateTime? @map("sent_at") @db.Timestamptz(3)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  contribution ReviewContribution @relation(fields: [contributionId], references: [id], onDelete: Restrict)
+  contribution ReviewContribution? @relation(fields: [contributionId], references: [id], onDelete: Restrict)
+  requestPost ReviewBoardPost? @relation("ReviewRequestPost", fields: [requestPostId], references: [id], onDelete: Restrict)
+  requestExpert ExpertAccount? @relation("ReviewRequestRecipient", fields: [requestExpertId], references: [id], onDelete: Restrict)
   attempts AnswerEmailAttempt[]
+  @@unique([requestPostId, requestExpertId])
   @@index([status, nextAttemptAt, leaseUntil])
   @@index([createdAt, id])
   @@map("answer_email_deliveries")

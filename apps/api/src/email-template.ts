@@ -5,6 +5,40 @@
   );
 const lines = (value: string) => escapeHtml(value).replace(/\r?\n/g, '<br>');
 
+export function renderReviewRequestEmail(text: string): string {
+  const marker = '\n\nOffice에서 검증하기\n';
+  const index = text.lastIndexOf(marker);
+  const tail = index >= 0 ? text.slice(index + marker.length) : '';
+  const candidate = tail.split('\n')[0]!;
+  let link = '';
+  try {
+    const url = new URL(candidate);
+    if (['https:', 'http:'].includes(url.protocol) && !url.username && !url.password)
+      link = url.href;
+  } catch {
+    // Preserve the complete text even if a stored snapshot has an invalid link.
+  }
+  const prefix = '검증을 원하는 질문이 등록되었습니다.\n\n질문\n';
+  const content = link ? text.slice(text.startsWith(prefix) ? prefix.length : 0, index) : text;
+  return `<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AI QAVER 검증 요청 안내</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,'Malgun Gothic','Apple SD Gothic Neo',sans-serif">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fff;border:1px solid #e2e8f0;border-top:4px solid #2563eb;border-radius:16px">
+<tr><td style="padding:24px;border-bottom:1px solid #eef2f7"><img src="https://search.aiqaver.com/brand/aiqaver-logo.png" width="180" alt="AI QAVER" style="display:block;width:180px;max-width:100%;height:auto;border:0"></td></tr>
+<tr><td style="padding:30px 24px 20px"><p style="margin:0 0 12px;font-size:12px;color:#2563eb;font-weight:bold">REVIEW REQUEST</p>
+<h1 style="margin:0;font-size:26px;line-height:1.4;color:#0b2347">검증을 원하는 질문이 등록되었습니다</h1></td></tr>
+<tr><td style="padding:0 24px 24px"><div style="padding:22px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;font-size:15px;line-height:1.85;color:#25364d;overflow-wrap:anywhere;word-break:break-word"><h2 style="margin:0 0 12px;font-size:14px;color:#2563eb">등록된 질문</h2>${lines(content)}</div></td></tr>
+${
+  link
+    ? `<tr><td align="center" style="padding:0 24px 28px"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td bgcolor="#2563eb" style="border-radius:8px;mso-padding-alt:16px 32px"><a href="${escapeHtml(link)}" style="display:inline-block;padding:16px 32px;color:#fff;text-decoration:none;font-weight:bold">Office에서 검증하기</a></td></tr></table>
+<p style="font-size:13px;line-height:1.7;color:#64748b">${lines(tail.slice(candidate.length).trim())}</p>
+<p style="font-size:12px;color:#64748b">버튼이 열리지 않으면 아래 주소로 접속해 주세요.</p><a href="${escapeHtml(link)}" style="font-size:13px;color:#2563eb;overflow-wrap:anywhere">${escapeHtml(link)}</a></td></tr>`
+    : ''
+}
+</table><p style="font-size:12px;color:#64748b">AI QAVER · 검증 요청 안내</p></td></tr></table></body></html>`;
+}
+
 // Render the queued snapshot at send time so retries use the renewed link.
 export function renderAnswerEmail(text: string): string {
   const marker = '\n\n답변 확인 링크 (30일간 유효)\n';
