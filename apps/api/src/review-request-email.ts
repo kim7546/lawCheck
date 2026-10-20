@@ -23,14 +23,14 @@ export function officeOrigin(env: NodeJS.ProcessEnv = process.env) {
 // Called only for a newly created request, in the same database transaction.
 export async function enqueueReviewRequestEmails(
   tx: Prisma.TransactionClient,
-  post: { id: string; question: string },
+  post: { id: string; question: string; aiAnswer: string },
   origin: string,
 ) {
   const lawyers = await tx.expertAccount.findMany({
     where: { isActive: true, expertGroup: 'LAWYER' },
     select: { id: true, email: true },
   });
-  const body = `검증을 원하는 질문이 등록되었습니다.\n\n질문\n${post.question}\n\nOffice에서 검증하기\n${origin}/\n\nOffice에 로그인한 뒤 검증 게시판에서 질문을 확인하고 답변해 주세요.`;
+  const body = `검증을 원하는 질문이 등록되었습니다.\n\n질문\n${post.question}\n\nAI 답변\n${post.aiAnswer}\n\nOffice에서 검증하기\n${origin}/\n\nOffice에 로그인한 뒤 검증 게시판에서 질문과 AI 답변을 확인하고 검증해 주세요.`;
   // Batches avoid an oversized insert while retaining atomic registration.
   for (let i = 0; i < lawyers.length; i += 200) {
     await tx.answerEmailDelivery.createMany({

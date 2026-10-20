@@ -69,7 +69,9 @@ test(
           { email: 'admin-only@example.com', name: '직역 없는 관리자', passwordHash },
         ],
       });
-      const app = createApp('Test', async () => ({ answer: 'AI 답변', isLegalQuestion: true }), {
+      const aiAnswer =
+        'AI 답변 전문\n<img src=x onerror=alert(1)> & 확인\n' + '긴 AI 답변 '.repeat(300);
+      const app = createApp('Test', async () => ({ answer: aiAnswer, isLegalQuestion: true }), {
         db,
         storage: new ChatStorage(db),
       });
@@ -117,6 +119,7 @@ test(
         assert.equal(delivery.linkTokenHash, null);
         assert.equal(delivery.linkExpiresAt, null);
         assert.ok(delivery.body.includes(question));
+        assert.ok(delivery.body.includes(`\n\nAI 답변\n${aiAnswer}`));
         assert.ok(delivery.body.includes(`${officeOrigin()}/`));
         assert.ok(!delivery.body.includes(payload.email));
       }
@@ -150,6 +153,11 @@ test(
       for (const mail of sent) {
         assert.equal(mail.subject, '[AI QAVER] 검증을 원하는 질문이 등록되었습니다');
         assert.ok(mail.text.includes(question));
+        assert.ok(mail.text.includes(aiAnswer));
+        assert.ok(mail.html?.includes('AI 답변 (변호사 검증 전)'));
+        assert.ok(mail.html?.includes('긴 AI 답변 '.repeat(300)));
+        assert.ok(mail.html?.includes('&lt;img src=x onerror=alert(1)&gt; &amp; 확인'));
+        assert.ok(!mail.html?.includes('<img src=x'));
         assert.ok(mail.html?.includes('&lt;script&gt;'));
         assert.ok(!mail.html?.includes('<script>'));
         assert.ok(mail.html?.includes(`href="${officeOrigin()}/"`));
@@ -240,6 +248,12 @@ test('Office email URLs require HTTPS in production and malformed snapshots rema
   const html = renderReviewRequestEmail(malformed);
   assert.ok(html.includes('&lt;img'));
   assert.ok(!html.includes('href="javascript:'));
+  const legacy = renderReviewRequestEmail(
+    '검증을 원하는 질문이 등록되었습니다.\n\n질문\n이전 질문 전문\n\nOffice에서 검증하기\nhttps://office.aiqaver.com/',
+  );
+  assert.ok(legacy.includes('이전 질문 전문'));
+  assert.ok(legacy.includes('href="https://office.aiqaver.com/"'));
+  assert.ok(!legacy.includes('AI 답변 (변호사 검증 전)'));
 });
 
 test(
