@@ -149,7 +149,7 @@ export default function AdminApp() {
                   type="password"
                   autoComplete="current-password"
                   required
-                  minLength={10}
+                  minLength={4}
                   maxLength={128}
                 />
               </label>

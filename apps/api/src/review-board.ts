@@ -102,10 +102,10 @@ export function reviewBoardRouter(db: PrismaClient, storage: ChatStorage) {
       identifier.length > 254 ||
       (signingUp && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) ||
       typeof password !== 'string' ||
-      password.length < 10 ||
+      password.length < 4 ||
       password.length > 128
     )
-      throw fail(400, '아이디 또는 이메일과 비밀번호(10~128자)를 확인해 주세요.');
+      throw fail(400, '아이디 또는 이메일과 비밀번호(4~128자)를 확인해 주세요.');
     const normalized = identifier.trim().toLowerCase();
     if (signingUp) {
       if (typeof name !== 'string' || !name.trim() || name.trim().length > 100)

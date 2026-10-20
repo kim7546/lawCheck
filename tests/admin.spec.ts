@@ -83,7 +83,7 @@ test('admin login, summary, member roles, codes and menu changes persist across 
     const post = route.request().method() === 'POST';
     const body = post ? route.request().postDataJSON() : null;
     if (path === '/login') {
-      if (body.password !== 'test-password-123')
+      if (body.password !== '1234')
         return route.fulfill({
           status: 401,
           json: { error: { message: '관리자 계정 또는 비밀번호를 확인해 주세요.' } },
@@ -160,7 +160,7 @@ test('admin login, summary, member roles, codes and menu changes persist across 
   await page.getByLabel('비밀번호', { exact: true }).fill('wrong-password-123');
   await page.getByRole('button', { name: '관리자 로그인', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('관리자 계정');
-  await page.getByLabel('비밀번호', { exact: true }).fill('test-password-123');
+  await page.getByLabel('비밀번호', { exact: true }).fill('1234');
   await page.getByRole('button', { name: '관리자 로그인', exact: true }).click();
   await expect(page.getByRole('heading', { name: '운영 요약' })).toBeVisible();
   await expect(page.locator('.admin-stat').filter({ hasText: '접수 질문' })).toContainText('120');

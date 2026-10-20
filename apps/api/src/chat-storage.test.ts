@@ -266,7 +266,7 @@ test(
       const signupFields = {
         betaSignupCode: '1004',
         username: 'expert_1',
-        passwordConfirmation: 'test-password-123',
+        passwordConfirmation: '1234',
         lawyerProfile: {
           mobilePhone: '010-1234-5678',
           registrationNumber: '001234',
@@ -294,13 +294,19 @@ test(
       await request(reviewApp).get('/api/v1/bo/reviews').expect(401);
       await expert
         .post('/api/v1/bo/signup')
-        .send({ email: 'review@example.com', password: 'short', name: '답변자' })
+        .send({
+          ...signupFields,
+          email: 'review@example.com',
+          password: '123',
+          passwordConfirmation: '123',
+          name: '답변자',
+        })
         .expect(400);
       const signup = await expert
         .post('/api/v1/bo/signup')
         .send({
           email: 'Review@example.com',
-          password: 'test-password-123',
+          password: '1234',
           name: '답변자',
           ...signupFields,
         })
@@ -339,13 +345,13 @@ test(
       }
       assert.ok(
         (await db.expertAccount.findUniqueOrThrow({ where: { id: signup.body.data.id } }))
-          .passwordHash !== 'test-password-123',
+          .passwordHash !== '1234',
       );
       await request(reviewApp)
         .post('/api/v1/bo/signup')
         .send({
           email: 'review@example.com',
-          password: 'test-password-123',
+          password: '1234',
           name: '중복',
           ...signupFields,
         })
@@ -359,7 +365,7 @@ test(
         .expect(401);
       await expert
         .post('/api/v1/bo/login')
-        .send({ email: 'review@example.com', password: 'test-password-123' })
+        .send({ email: 'review@example.com', password: '1234' })
         .expect(200);
       await otherExpert
         .post('/api/v1/bo/signup')
@@ -708,7 +714,7 @@ test(
       const legacyClient = request.agent(reviewApp);
       const legacyLogin = await legacyClient
         .post('/api/v1/bo/login')
-        .send({ email: legacy.email, password: 'test-password-123' })
+        .send({ email: legacy.email, password: '1234' })
         .expect(200);
       assert.equal(legacyLogin.body.data.expertGroup, null);
       assert.equal(legacyLogin.body.data.username, null);
@@ -723,7 +729,7 @@ test(
       });
       const invalidBase = {
         email: 'invalid@example.com',
-        password: 'test-password-123',
+        password: '1234',
         name: 'Invalid',
         ...signupFields,
         username: 'invalid_user',
@@ -934,7 +940,7 @@ test(
       const byUsername = request.agent(lawyerApp);
       await byUsername
         .post('/api/v1/bo/login')
-        .send({ identifier: ' EXPERT_1 ', password: 'test-password-123' })
+        .send({ identifier: ' EXPERT_1 ', password: '1234' })
         .expect(200);
       assert.equal((await byUsername.get('/api/v1/bo/me')).body.data.id, signup.body.data.id);
       await byUsername

@@ -83,10 +83,10 @@ export function adminRouter(db: PrismaClient) {
       !identifier.trim() ||
       identifier.length > 254 ||
       typeof password !== 'string' ||
-      password.length < 10 ||
+      password.length < 4 ||
       password.length > 128
     )
-      throw fail(400, '아이디 또는 이메일과 비밀번호(10~128자)를 확인해 주세요.');
+      throw fail(400, '아이디 또는 이메일과 비밀번호(4~128자)를 확인해 주세요.');
     const normalized = identifier.trim().toLowerCase();
     const user = await db.expertAccount.findUnique({
       where: normalized.includes('@') ? { email: normalized } : { username: normalized },

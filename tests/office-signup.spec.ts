@@ -84,7 +84,7 @@ test('Office signup requires explicit profession and all versioned consents, wit
   await page.getByLabel('클로즈 베타 가입코드', { exact: true }).fill('1004');
   await page.getByLabel('이름', { exact: true }).fill('가입 테스트');
   await page.getByLabel('이메일', { exact: true }).fill('signup@example.com');
-  await page.getByLabel('비밀번호', { exact: true }).fill('test-password-123');
+  await page.getByLabel('비밀번호', { exact: true }).fill('1234');
   await page.getByLabel('아이디', { exact: true }).fill('lawyer_test');
   await page.getByLabel('비밀번호 확인', { exact: true }).fill('mismatch-password');
   await page.getByLabel('휴대전화', { exact: true }).fill('010-1234-5678');
@@ -101,7 +101,7 @@ test('Office signup requires explicit profession and all versioned consents, wit
   await submit.click();
   await expect(page.getByRole('alert')).toHaveText('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
   expect(signupRequests).toBe(0);
-  await page.getByLabel('비밀번호 확인', { exact: true }).fill('test-password-123');
+  await page.getByLabel('비밀번호 확인', { exact: true }).fill('1234');
   const privacy = page.getByRole('checkbox', { name: /개인정보 수집·이용 동의/ });
   await privacy.uncheck();
   await expect(all).toHaveJSProperty('indeterminate', true);
@@ -160,8 +160,8 @@ test('Office signup requires a beta code and retains optional lawyer details', a
   await page.getByLabel('이름', { exact: true }).fill('최소 가입');
   await page.getByLabel('아이디', { exact: true }).fill('minimal_user');
   await page.getByLabel('이메일', { exact: true }).fill('minimal@example.com');
-  await page.getByLabel('비밀번호', { exact: true }).fill('test-password-123');
-  await page.getByLabel('비밀번호 확인', { exact: true }).fill('test-password-123');
+  await page.getByLabel('비밀번호', { exact: true }).fill('1234');
+  await page.getByLabel('비밀번호 확인', { exact: true }).fill('1234');
   await page.getByRole('radio', { name: '변호사', exact: true }).check();
   await page.getByRole('checkbox', { name: '모두 동의', exact: true }).check();
   const betaCode = page.getByLabel('클로즈 베타 가입코드', { exact: true });

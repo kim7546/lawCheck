@@ -281,10 +281,10 @@ function App() {
                       name="password"
                       type="password"
                       autoComplete="current-password"
-                      minLength={10}
+                      minLength={4}
                       maxLength={128}
                       required
-                      placeholder="10자 이상 입력"
+                      placeholder="4자 이상, 문자 조합 제한 없음"
                     />
                   </label>
                 </>

@@ -37,7 +37,7 @@ test(
         },
       });
       const salt = 'a'.repeat(32);
-      const password = 'test-password-123';
+      const password = '1234';
       const passwordHash = `${salt}:${scryptSync(password, salt, 64).toString('hex')}`;
       const adminUser = await db.expertAccount.create({
         data: {
@@ -451,6 +451,63 @@ test(
         include: { lawyerProfile: true },
       });
       assert.deepEqual({ ...afterGrant, updatedAt: beforeBootstrap.updatedAt }, beforeBootstrap);
+      const resetUser = await db.expertAccount.create({
+        data: {
+          username: 'reset_lawyer',
+          email: 'reset@example.com',
+          name: '재설정 테스트',
+          expertGroup: 'LAWYER',
+          passwordHash,
+          adminProfile: { create: {} },
+        },
+      });
+      const expiresAt = new Date(Date.now() + 60000);
+      await db.expertLoginSession.create({
+        data: { accountId: resetUser.id, tokenHash: 'a'.repeat(64), expiresAt },
+      });
+      await db.adminLoginSession.create({
+        data: { accountId: resetUser.id, tokenHash: 'b'.repeat(64), expiresAt },
+      });
+      const newHash = `${salt}:${scryptSync('5678', salt, 64).toString('hex')}`;
+      const reset = (id: string, hash = newHash) =>
+        runNode([
+          fileURLToPath(new URL('../prisma/reset-office-password.mjs', import.meta.url)),
+          'reset_lawyer',
+          id,
+          hash,
+        ]);
+      await assert.rejects(reset(randomUUID()), /target did not match/);
+      await assert.rejects(reset(resetUser.id, 'plaintext'), /Usage:/);
+      assert.equal(
+        (await db.expertAccount.findUniqueOrThrow({ where: { id: resetUser.id } })).passwordHash,
+        passwordHash,
+      );
+      const resetResult = await reset(resetUser.id);
+      assert.ok(!resetResult.stdout.includes(newHash));
+      assert.equal(await db.expertLoginSession.count({ where: { accountId: resetUser.id } }), 0);
+      assert.equal(await db.adminLoginSession.count({ where: { accountId: resetUser.id } }), 0);
+      const resetApp = createApp('Test', async () => ({ answer: '', isLegalQuestion: true }), {
+        db,
+        storage: new ChatStorage(db),
+      });
+      for (const path of ['/api/v1/bo/login', '/api/v1/admin/login']) {
+        await request(resetApp)
+          .post(path)
+          .send({ identifier: 'reset_lawyer', password: '123' })
+          .expect(400);
+        await request(resetApp)
+          .post(path)
+          .send({ identifier: 'reset_lawyer', password: 'x'.repeat(129) })
+          .expect(400);
+        await request(resetApp)
+          .post(path)
+          .send({ identifier: 'reset_lawyer', password })
+          .expect(401);
+        await request(resetApp)
+          .post(path)
+          .send({ identifier: 'reset_lawyer', password: '5678' })
+          .expect(200);
+      }
     } finally {
       await db?.$disconnect();
       await socket.stop();

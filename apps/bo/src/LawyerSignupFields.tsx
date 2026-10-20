@@ -67,10 +67,10 @@ export function LawyerSignupFields({ busy }: { busy: boolean }) {
           name="password"
           type="password"
           autoComplete="new-password"
-          minLength={10}
+          minLength={4}
           maxLength={128}
           required
-          placeholder="10자 이상 입력"
+          placeholder="4자 이상, 문자 조합 제한 없음"
         />
       </label>
       <label>
@@ -82,7 +82,7 @@ export function LawyerSignupFields({ busy }: { busy: boolean }) {
           name="passwordConfirmation"
           type="password"
           autoComplete="new-password"
-          minLength={10}
+          minLength={4}
           maxLength={128}
           required
           placeholder="비밀번호를 한 번 더 입력"
