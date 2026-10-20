@@ -854,6 +854,10 @@ function ChatApp({ restoredSessionId }: { restoredSessionId?: string }) {
             </button>
           </div>
         </header>
+        <aside className="service-test-notice" aria-label="임시 테스트 안내">
+          <strong>본 서비스는 현재 임시 테스트 중입니다.</strong> 제공되는 답변은 기능 테스트용 참고
+          자료이며, 정식 법률 상담이나 조언을 제공하거나 법률 서비스를 광고하기 위한 것이 아닙니다.
+        </aside>
         <main className="conversation-pane" aria-busy={switching}>
           <div className="chat-scroll">
             {restoredSessionId === currentId && (
